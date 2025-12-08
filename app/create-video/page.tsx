@@ -87,29 +87,19 @@ export default function CreateVideoPage() {
     if (!generatedVideo) return
 
     try {
-      // If it's a gs:// URI, we need to convert it to a downloadable URL
-      if (generatedVideo.startsWith("gs://")) {
-        alert(
-          "Video oluşturuldu! URI: " +
-            generatedVideo +
-            "\n\nNot: Google Cloud Storage URI'sini indirmek için ek yapılandırma gereklidir.",
-        )
-        return
-      }
-
       const response = await fetch(generatedVideo)
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `video-${Date.now()}.mp4`
+      a.download = `stylescape-video-${Date.now()}.mp4`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error) {
       console.error("[v0] Download error:", error)
-      alert("Video indirilemedi. Video URI: " + generatedVideo)
+      alert("Video indirilemedi. Lütfen tekrar deneyin.")
     }
   }
 

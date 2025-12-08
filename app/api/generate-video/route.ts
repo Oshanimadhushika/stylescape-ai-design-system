@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai"
+import { fal } from "@fal-ai/client"
 
 export const maxDuration = 60 // Maximum allowed by Vercel
 
@@ -10,75 +10,65 @@ export async function POST(req: Request) {
       return Response.json({ error: "Manken resmi gereklidir" }, { status: 400 })
     }
 
-    // Check for Gemini API key
-    if (!process.env.GEMINI_API_KEY) {
-      return Response.json({ error: "GEMINI_API_KEY environment variable gereklidir" }, { status: 500 })
+    if (!process.env.FAL_KEY) {
+      return Response.json({ error: "FAL_KEY environment variable gereklidir" }, { status: 500 })
     }
 
-    console.log("[v0] Starting video generation with Google Veo 3.1...")
+    console.log("[v0] Starting video generation with fal.ai Veo3...")
 
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY,
+    // Configure fal client
+    fal.config({
+      credentials: process.env.FAL_KEY,
     })
 
-    // Build comprehensive prompt
-    const fullPrompt = `Professional fashion video: ${prompt || "Model showcasing outfit with professional movements"}
-Style: ${style}
-Motion speed: ${motion}
-Camera work: Professional studio lighting, high-quality cinematography
-Duration: ${duration || 5} seconds`
+    const fullPrompt = `${prompt || "Professional model showcasing fashion outfit with smooth, natural movements"}. ${style ? `Style: ${style}.` : ""} ${motion ? `Camera motion: ${motion}.` : ""} Professional studio lighting, cinematic quality, high-end fashion photography.`
 
-    console.log("[v0] Veo prompt:", fullPrompt)
+    console.log("[v0] Veo3 prompt:", fullPrompt)
+    console.log("[v0] Model image:", modelImage.substring(0, 100) + "...")
 
-    // Start video generation operation
-    let operation = await ai.models.generateVideos({
-      model: "veo-3.1-fast-generate-preview", // Using fast preview model
-      prompt: fullPrompt,
-      config: {
-        aspectRatio: "9:16", // Vertical video for social media
-        resolution: "720p",
-        // You can add image_url for image-to-video when available
+    const result = await fal.subscribe("fal-ai/veo3/fast/image-to-video", {
+      input: {
+        prompt: fullPrompt,
+        image_url: modelImage,
+      },
+      logs: true,
+      onQueueUpdate: (update) => {
+        console.log("[v0] Queue status:", update.status)
+        if (update.status === "IN_PROGRESS" && update.logs) {
+          update.logs.map((log) => log.message).forEach(console.log)
+        }
       },
     })
 
-    console.log("[v0] Video generation started, polling for completion...")
+    console.log("[v0] Veo3 result:", JSON.stringify(result, null, 2))
 
-    // Poll until video is ready (max 4 minutes)
-    const maxAttempts = 24 // 24 attempts * 10 seconds = 4 minutes
-    let attempts = 0
-
-    while (!operation.done && attempts < maxAttempts) {
-      console.log("[v0] Waiting for video generation... Attempt", attempts + 1)
-      await new Promise((resolve) => setTimeout(resolve, 10000)) // Wait 10 seconds
-
-      operation = await ai.operations.getVideosOperation({
-        operation: operation,
-      })
-
-      attempts++
-    }
-
-    if (!operation.done) {
-      console.error("[v0] Video generation timeout")
-      return Response.json({ error: "Video oluşturma zaman aşımına uğradı. Lütfen tekrar deneyin." }, { status: 500 })
-    }
-
-    if (!operation.response?.generatedVideos?.[0]?.video) {
-      console.error("[v0] No video in response:", operation)
+    if (!result.data) {
+      console.error("[v0] No data in response:", result)
       return Response.json({ error: "Video oluşturulamadı. Lütfen tekrar deneyin." }, { status: 500 })
     }
 
     console.log("[v0] Video generated successfully!")
 
-    // Get the video file URI
-    const videoUri = operation.response.generatedVideos[0].video.uri
+    let videoUrl
+    if (typeof result.data.video === "string") {
+      videoUrl = result.data.video
+    } else if (result.data.video && result.data.video.url) {
+      videoUrl = result.data.video.url
+    } else if (result.data.url) {
+      videoUrl = result.data.url
+    } else {
+      console.error("[v0] Unexpected response structure:", result.data)
+      return Response.json({ error: "Video oluşturulamadı. Lütfen tekrar deneyin." }, { status: 500 })
+    }
 
     return Response.json({
-      video: videoUri,
-      videoName: operation.response.generatedVideos[0].video.name,
+      video: videoUrl,
+      videoName: `stylescape-video-${Date.now()}.mp4`,
     })
   } catch (error) {
     console.error("[v0] Video generation error:", error)
+    console.error("[v0] Error details:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+
     return Response.json(
       {
         error: error instanceof Error ? error.message : "Bir hata oluştu. Lütfen tekrar deneyin.",
