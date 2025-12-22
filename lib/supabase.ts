@@ -31,3 +31,16 @@ export type Model = {
   image_url: string
   created_at: string
 }
+
+export type Outfit = {
+  id: string
+  name: string
+  model_id: string | null
+  top_clothing_url: string | null
+  bottom_clothing_url: string | null
+  outerwear_clothing_url: string | null
+  accessories_clothing_url: string | null
+  result_image_url: string | null
+  studio_settings: any
+  created_at: string
+}

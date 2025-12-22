@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { Sparkles, ImageIcon, Video, Menu } from "lucide-react"
+import { Sparkles, ImageIcon, Video, Menu, Layers } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 
@@ -21,6 +21,11 @@ const navItems = [
     title: "Try-On",
     href: "/try-on",
     icon: ImageIcon,
+  },
+  {
+    title: "Mix & Match",
+    href: "/mix-match",
+    icon: Layers,
   },
   {
     title: "Video Oluştur",

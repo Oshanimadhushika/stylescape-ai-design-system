@@ -80,7 +80,7 @@ CONSISTENCY NOTE: This model's specifications must be saved and maintained for f
 OUTPUT: A single, professional-quality photograph meeting all above specifications.`
 
     const result = await generateText({
-      model: "google/gemini-3-pro-image-preview",
+      model: "google/gemini-2.5-flash-image",
       prompt: contextPrompt,
       maxOutputTokens: 2000,
     })
