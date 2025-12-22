@@ -1,4 +1,4 @@
-import { generateText } from "ai"
+import { experimental_generateImage } from "ai"
 
 export const maxDuration = 30
 
@@ -79,32 +79,22 @@ CONSISTENCY NOTE: This model's specifications must be saved and maintained for f
 
 OUTPUT: A single, professional-quality photograph meeting all above specifications.`
 
-    const result = await generateText({
+    console.log("[v0] Generating image with prompt length:", contextPrompt.length)
+
+    const { image } = await experimental_generateImage({
       model: "google/gemini-2.5-flash-image",
       prompt: contextPrompt,
-      maxOutputTokens: 2000,
     })
 
-    const images = []
-    for (const file of result.files) {
-      if (file.mediaType.startsWith("image/")) {
-        images.push({
-          base64: file.base64,
-          mediaType: file.mediaType,
-        })
-      }
-    }
-
-    if (images.length === 0) {
-      return Response.json({ error: "Görsel oluşturulamadı. Lütfen tekrar deneyin." }, { status: 500 })
-    }
+    console.log("[v0] Image generated successfully")
 
     return Response.json({
-      image: `data:${images[0].mediaType};base64,${images[0].base64}`,
-      usage: result.usage,
+      image: image.base64,
     })
   } catch (error) {
     console.error("[v0] Model generation error:", error)
-    return Response.json({ error: "Bir hata oluştu. Lütfen tekrar deneyin." }, { status: 500 })
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    console.error("[v0] Error details:", errorMessage)
+    return Response.json({ error: `Görsel oluşturulamadı: ${errorMessage}` }, { status: 500 })
   }
 }
