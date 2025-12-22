@@ -75,16 +75,23 @@ export default function MixMatchPage() {
 
   const loadSavedModels = async () => {
     setIsLoadingModels(true)
+    console.log("[v0] Starting to load saved models...")
     try {
       const supabase = getSupabase()
+      console.log("[v0] Supabase client created, fetching models...")
       const { data, error } = await supabase.from("models").select("*").order("created_at", { ascending: false })
 
+      console.log("[v0] Supabase response:", { data, error })
       if (error) throw error
+      console.log("[v0] Successfully loaded models:", data?.length || 0)
       setSavedModels(data || [])
     } catch (error) {
-      console.error("Error loading models:", error)
+      console.error("[v0] Error loading models:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      console.error("[v0] Error details:", errorMessage)
       setSavedModels([])
     } finally {
+      console.log("[v0] Finished loading models, setting loading to false")
       setIsLoadingModels(false)
     }
   }

@@ -3,6 +3,16 @@ import { createBrowserClient } from "@supabase/ssr"
 let supabaseClient: ReturnType<typeof createBrowserClient> | null = null
 
 export function getSupabase() {
+  if (typeof window !== "undefined") {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+    const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+    if (!url || !key) {
+      console.error("[v0] Supabase environment variables missing")
+      throw new Error("Supabase URL and API key are required")
+    }
+  }
+
   if (!supabaseClient) {
     supabaseClient = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
