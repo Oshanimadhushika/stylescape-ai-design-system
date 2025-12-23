@@ -1,4 +1,4 @@
-import { experimental_generateImage } from "ai"
+import { generateText } from "ai"
 
 export const maxDuration = 30
 
@@ -79,17 +79,42 @@ CONSISTENCY NOTE: This model's specifications must be saved and maintained for f
 
 OUTPUT: A single, professional-quality photograph meeting all above specifications.`
 
-    console.log("[v0] Generating image with prompt length:", contextPrompt.length)
+    console.log("[v0] Generating image with Gemini multimodal model...")
 
-    const { image } = await experimental_generateImage({
+    const result = await generateText({
       model: "google/gemini-2.5-flash-image",
       prompt: contextPrompt,
     })
 
-    console.log("[v0] Image generated successfully")
+    console.log("[v0] Generation result:", JSON.stringify(result, null, 2))
+
+    let imageBase64: string | null = null
+
+    // Search through all steps and content parts
+    if (result.steps) {
+      for (const step of result.steps) {
+        if (step.content) {
+          for (const part of step.content) {
+            if (part.type === "file" && part.file?.base64Data) {
+              imageBase64 = part.file.base64Data
+              console.log("[v0] Found image in file part")
+              break
+            }
+          }
+          if (imageBase64) break
+        }
+      }
+    }
+
+    if (!imageBase64) {
+      console.error("[v0] No image found in response. Result structure:", JSON.stringify(result, null, 2))
+      throw new Error("No output specified.")
+    }
+
+    console.log("[v0] Image generated successfully, base64 length:", imageBase64.length)
 
     return Response.json({
-      image: image.base64,
+      image: `data:image/png;base64,${imageBase64}`,
     })
   } catch (error) {
     console.error("[v0] Model generation error:", error)
