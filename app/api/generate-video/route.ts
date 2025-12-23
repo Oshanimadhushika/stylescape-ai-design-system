@@ -11,7 +11,27 @@ export async function POST(req: Request) {
     }
 
     if (!process.env.FAL_KEY) {
-      return Response.json({ error: "FAL_KEY environment variable gereklidir" }, { status: 500 })
+      console.error("[v0] FAL_KEY environment variable is missing")
+      return Response.json(
+        {
+          error: "FAL_KEY environment variable'ı ayarlanmamış. Lütfen v0'ın 'Vars' bölümünden FAL_KEY ekleyin.",
+        },
+        { status: 500 },
+      )
+    }
+
+    // Validate FAL_KEY format
+    const keyFormat = process.env.FAL_KEY
+    console.log("[v0] FAL_KEY format check:", keyFormat.substring(0, 20) + "...")
+
+    if (!keyFormat.includes(":")) {
+      console.error("[v0] FAL_KEY appears to be in wrong format (should be KEY_ID:KEY_SECRET)")
+      return Response.json(
+        {
+          error: "FAL_KEY formatı yanlış. Format: KEY_ID:KEY_SECRET şeklinde olmalı",
+        },
+        { status: 500 },
+      )
     }
 
     console.log("[v0] Starting video generation with fal.ai Veo3...")
@@ -24,21 +44,38 @@ export async function POST(req: Request) {
     const fullPrompt = `${prompt || "Professional model showcasing fashion outfit with smooth, natural movements"}. ${style ? `Style: ${style}.` : ""} ${motion ? `Camera motion: ${motion}.` : ""} Professional studio lighting, cinematic quality, high-end fashion photography.`
 
     console.log("[v0] Veo3 prompt:", fullPrompt)
-    console.log("[v0] Model image:", modelImage.substring(0, 100) + "...")
+    console.log("[v0] Model image length:", modelImage.length)
 
-    const result = await fal.subscribe("fal-ai/veo3/fast/image-to-video", {
-      input: {
-        prompt: fullPrompt,
-        image_url: modelImage,
-      },
-      logs: true,
-      onQueueUpdate: (update) => {
-        console.log("[v0] Queue status:", update.status)
-        if (update.status === "IN_PROGRESS" && update.logs) {
-          update.logs.map((log) => log.message).forEach(console.log)
-        }
-      },
-    })
+    let result
+    try {
+      result = await fal.subscribe("fal-ai/veo3/fast/image-to-video", {
+        input: {
+          prompt: fullPrompt,
+          image_url: modelImage,
+        },
+        logs: true,
+        onQueueUpdate: (update) => {
+          console.log("[v0] Queue status:", update.status)
+          if (update.status === "IN_PROGRESS" && update.logs) {
+            update.logs.map((log) => log.message).forEach(console.log)
+          }
+        },
+      })
+    } catch (falError: any) {
+      console.error("[v0] fal.ai API error:", falError)
+
+      if (falError.status === 403) {
+        return Response.json(
+          {
+            error:
+              "fal.ai API key geçersiz veya yetkisiz. Lütfen FAL_KEY'i kontrol edin ve fal.ai dashboard'unuzdan yeni bir key alın.",
+          },
+          { status: 403 },
+        )
+      }
+
+      throw falError
+    }
 
     console.log("[v0] Veo3 result:", JSON.stringify(result, null, 2))
 
