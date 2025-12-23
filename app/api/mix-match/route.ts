@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { experimental_generateImage } from "ai"
+import { generateText } from "ai"
 
 export const maxDuration = 60
 
@@ -87,12 +87,43 @@ Style: professional fashion photography, editorial quality, commercial ready`
 
     console.log("[v0] Mix & Match prompt:", prompt.substring(0, 200) + "...")
 
-    const { image } = await experimental_generateImage({
+    const result = await generateText({
       model: "google/gemini-2.5-flash-image",
-      prompt: prompt,
+      messages: [
+        {
+          role: "user",
+          content: prompt,
+        },
+      ],
     })
 
-    const base64Image = await image.toDataURL()
+    console.log("[v0] Mix & Match result received")
+
+    let base64Data: string | null = null
+
+    if (result.steps) {
+      for (const step of result.steps) {
+        if (step.type === "tool-result" && step.content) {
+          for (const part of step.content) {
+            if (part.type === "file" && part.data) {
+              base64Data = part.data
+              console.log("[v0] Found image in step content")
+              break
+            }
+          }
+        }
+        if (base64Data) break
+      }
+    }
+
+    if (!base64Data) {
+      console.error("[v0] No image found in result")
+      console.error("[v0] Result structure:", JSON.stringify(result, null, 2))
+      throw new Error("No image generated")
+    }
+
+    const base64Image = `data:image/png;base64,${base64Data}`
+    console.log("[v0] Mix & Match image generated successfully")
 
     return NextResponse.json({
       resultImage: base64Image,
@@ -100,6 +131,7 @@ Style: professional fashion photography, editorial quality, commercial ready`
     })
   } catch (error: any) {
     console.error("[v0] Mix & Match error:", error)
+    console.error("[v0] Error details:", error?.message)
     return NextResponse.json(
       {
         error: error?.message || "Mix & Match generation failed",
