@@ -167,7 +167,7 @@ export default function CreateModelPage() {
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       ) : (
-        <main className="container mx-auto px-4 py-12">
+        <main className="container mx-auto px-4 py-12" suppressHydrationWarning>
           <div className="mb-8 text-center">
             <h1 className="mb-2 text-4xl font-bold">AI Manken Oluştur</h1>
             <p className="text-muted-foreground leading-relaxed">
@@ -574,9 +574,15 @@ export default function CreateModelPage() {
                             }
                             variant="secondary"
                           >
-                            {isGenerating ? "Revize Ediliyor..." : "Revize Et"}
+                            <span className={isGenerating ? "" : "hidden"}>
+                              Revize Ediliyor...
+                            </span>
+                            <span className={isGenerating ? "hidden" : ""}>
+                              Revize Et
+                            </span>
                           </Button>
                         </div>
+
                         <p className="text-xs text-muted-foreground italic">
                           AI mevcut mankeni verdiğiniz talimatlara göre
                           güncelleyecektir.
