@@ -1,6 +1,10 @@
-import { generateText } from "ai"
+import { GoogleGenAI } from "@google/genai";
 
-export const maxDuration = 30
+export const maxDuration = 30;
+
+const ai = new GoogleGenAI({
+  apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY,
+});
 
 export async function POST(req: Request) {
   try {
@@ -17,109 +21,107 @@ export async function POST(req: Request) {
       ageRange,
       pose,
       environment,
-    } = await req.json()
+      lastGeneratedImage,
+      revisionInstructions,
+    } = await req.json();
 
-    if (!description) {
-      return Response.json({ error: "Açıklama gereklidir" }, { status: 400 })
+    if (!description && !revisionInstructions) {
+      return Response.json(
+        { error: "Açıklama veya revizyon talimatı gereklidir" },
+        { status: 400 }
+      );
     }
 
-    const contextPrompt = `PROFESSIONAL FASHION MODEL GENERATION - DETAILED SPECIFICATIONS
+    const isRevision = !!lastGeneratedImage && !!revisionInstructions;
+
+    const contextPrompt = isRevision
+      ? `REVISION TASK - MODIFY THE ATTACHED FASHION MODEL IMAGE
+      
+      PREVIOUS MODEL SPECIFICATIONS (FOR CONTEXT):
+      - Gender: ${gender}, Age: ${ageRange}, Height: ${height}, Body: ${bodyType}
+      - Hair: ${hairColor} ${hairStyle}, Tone: ${skinTone}, Style: ${style}
+      
+      REVISION INSTRUCTIONS:
+      ${revisionInstructions}
+      
+      CRITICAL REQUIREMENTS:
+      - Apply the requested changes while keeping the overall quality and composition consistent with the original model's identity.
+      - Output a single, professional-quality fashion photograph.`
+      : `PROFESSIONAL FASHION MODEL GENERATION - DETAILED SPECIFICATIONS
 
 CRITICAL CONSISTENCY REQUIREMENTS:
-- Generate a high-resolution, professional fashion model photograph suitable for e-commerce virtual try-on applications
-- Maintain photorealistic quality with studio-grade lighting and professional photography standards
-- The model must be positioned for optimal clothing overlay and virtual try-on compatibility
+- Generate a high-resolution, professional fashion model photograph
+- Positioned for optimal clothing overlay and virtual try-on compatibility
 
-PHYSICAL SPECIFICATIONS (MUST BE EXACT):
-- Gender: ${gender}
-- Age Range: ${ageRange} years old
-- Height Classification: ${height}
-- Body Type: ${bodyType} build
-- Clothing Size: ${clothingSize} (Turkish sizing)
-- Skin Tone: ${skinTone} complexion with natural, even skin texture
-- Hair Color: ${hairColor}
-- Hair Style: ${hairStyle}
+PHYSICAL SPECIFICATIONS:
+- Gender: ${gender}, Age: ${ageRange}, Height: ${height}, Body: ${bodyType}, Size: ${clothingSize}
+- Tone: ${skinTone}, Hair: ${hairColor} ${hairStyle}
 
-POSE AND POSITIONING (CRITICAL FOR TRY-ON):
-- Pose Type: ${pose}
-- Body should be fully visible from head to below knees
-- Arms should be positioned naturally, slightly away from body for clothing visibility
-- Hands should be relaxed and neutral
-- Facial expression: confident, professional, neutral smile
-- Direct eye contact with camera for frontal poses
+STYLE & SETUP:
+- Pose: ${pose}, Environment: ${environment}, Style: ${style}
 
-ENVIRONMENT AND LIGHTING:
-- Background: ${environment}
-- Lighting: Professional three-point studio lighting setup
-- No harsh shadows on body (critical for try-on applications)
-- Even, flattering illumination across entire figure
-- High dynamic range for clothing detail preservation
+USER NOTES: ${description}
 
-CLOTHING (NEUTRAL BASE FOR TRY-ON):
-- Solid color, form-fitting base outfit (tank top/simple top + fitted pants or shorts)
-- Colors: neutral tones (white, gray, beige, black)
-- No patterns, logos, or complex details
-- Clothing should clearly show body proportions for accurate virtual try-on
+OUTPUT: A single, professional-quality photograph.`;
 
-TECHNICAL SPECIFICATIONS:
-- Resolution: Minimum 1024x1536 pixels (2:3 aspect ratio)
-- Focus: Sharp, professional focus on model
-- Color accuracy: Natural, color-calibrated
-- No grain, artifacts, or compression issues
+    console.log("[v0] Generating image with Direct Gemini SDK...");
 
-STYLE DIRECTION:
-- Overall aesthetic: ${style}
-- Professional fashion photography standards
-- Suitable for ${gender === "kadın" ? "women's" : gender === "erkek" ? "men's" : "unisex"} fashion brand campaigns
+    let imageBase64: string | null = null;
 
-USER'S ADDITIONAL NOTES:
-${description}
+    if (isRevision) {
+      // For revision, we use Imagen 3 with the revision prompt.
+      const result = await ai.models.generateImages({
+        model: "imagen-4.0-generate-001",
+        prompt: contextPrompt,
+        config: {
+          numberOfImages: 1,
+        },
+      });
 
-CONSISTENCY NOTE: This model's specifications must be saved and maintained for future try-on sessions to ensure brand consistency.
+      const genImage = result.generatedImages?.[0] as any;
+      if (genImage) {
+        imageBase64 =
+          genImage.image?.imageBytes ||
+          genImage.imageBytes ||
+          genImage.imageData ||
+          genImage.base64;
+      }
+    } else {
+      const result = await ai.models.generateImages({
+        model: "imagen-4.0-generate-001",
+        prompt: contextPrompt,
+        config: {
+          numberOfImages: 1,
+        },
+      });
 
-OUTPUT: A single, professional-quality photograph meeting all above specifications.`
-
-    console.log("[v0] Generating image with Gemini multimodal model...")
-
-    const result = await generateText({
-      model: "google/gemini-2.5-flash-image",
-      prompt: contextPrompt,
-    })
-
-    console.log("[v0] Generation result:", JSON.stringify(result, null, 2))
-
-    let imageBase64: string | null = null
-
-    // Search through all steps and content parts
-    if (result.steps) {
-      for (const step of result.steps) {
-        if (step.content) {
-          for (const part of step.content) {
-            if (part.type === "file" && part.file?.base64Data) {
-              imageBase64 = part.file.base64Data
-              console.log("[v0] Found image in file part")
-              break
-            }
-          }
-          if (imageBase64) break
-        }
+      const genImage = result.generatedImages?.[0] as any;
+      if (genImage) {
+        imageBase64 =
+          genImage.image?.imageBytes ||
+          genImage.imageBytes ||
+          genImage.imageData ||
+          genImage.base64;
       }
     }
 
     if (!imageBase64) {
-      console.error("[v0] No image found in response. Result structure:", JSON.stringify(result, null, 2))
-      throw new Error("No output specified.")
+      console.error("[v0] No image found in response.");
+      throw new Error("Görsel oluşturulamadı.");
     }
 
-    console.log("[v0] Image generated successfully, base64 length:", imageBase64.length)
+    console.log("[v0] Image generated successfully");
 
     return Response.json({
       image: `data:image/png;base64,${imageBase64}`,
-    })
+    });
   } catch (error) {
-    console.error("[v0] Model generation error:", error)
-    const errorMessage = error instanceof Error ? error.message : "Unknown error"
-    console.error("[v0] Error details:", errorMessage)
-    return Response.json({ error: `Görsel oluşturulamadı: ${errorMessage}` }, { status: 500 })
+    console.error("[v0] Model generation error:", error);
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+    return Response.json(
+      { error: `Görsel oluşturulamadı: ${errorMessage}` },
+      { status: 500 }
+    );
   }
 }

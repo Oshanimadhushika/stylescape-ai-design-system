@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Sparkles, ImageIcon, Video, Menu, Layers } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Sparkles, ImageIcon, Video, Menu, Layers } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 const navItems = [
   {
@@ -32,10 +32,10 @@ const navItems = [
     href: "/create-video",
     icon: Video,
   },
-]
+];
 
 export function Navigation() {
-  const pathname = usePathname()
+  const pathname = usePathname();
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -50,15 +50,18 @@ export function Navigation() {
         {/* Desktop Navigation */}
         <nav className="hidden items-center gap-1 md:flex">
           {navItems.map((item) => {
-            const Icon = item.icon
+            const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href}>
-                <Button variant={pathname === item.href ? "secondary" : "ghost"} className="gap-2">
+                <Button
+                  variant={pathname === item.href ? "secondary" : "ghost"}
+                  className="gap-2"
+                >
                   <Icon className="h-4 w-4" />
                   {item.title}
                 </Button>
               </Link>
-            )
+            );
           })}
         </nav>
 
@@ -73,7 +76,7 @@ export function Navigation() {
           <SheetContent side="right" className="w-[300px]">
             <nav className="flex flex-col gap-2 pt-6">
               {navItems.map((item) => {
-                const Icon = item.icon
+                const Icon = item.icon;
                 return (
                   <Link key={item.href} href={item.href}>
                     <Button
@@ -84,12 +87,12 @@ export function Navigation() {
                       {item.title}
                     </Button>
                   </Link>
-                )
+                );
               })}
             </nav>
           </SheetContent>
         </Sheet>
       </div>
     </header>
-  )
+  );
 }
