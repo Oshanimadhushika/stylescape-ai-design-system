@@ -1,5 +1,4 @@
 import { GoogleGenAI } from "@google/genai";
-
 export const maxDuration = 30;
 
 const ai = new GoogleGenAI({
