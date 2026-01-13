@@ -1,56 +1,76 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { Navigation } from "@/components/navigation"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Slider } from "@/components/ui/slider"
-import { Video, Upload, Loader2, Download, Play, ImageIcon, Sparkles } from "lucide-react"
-import { useState, useRef, useEffect } from "react"
-import { Badge } from "@/components/ui/badge"
+import { Navigation } from "@/components/navigation";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Slider } from "@/components/ui/slider";
+import {
+  Video,
+  Upload,
+  Loader2,
+  Download,
+  Play,
+  ImageIcon,
+  Sparkles,
+} from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Badge } from "@/components/ui/badge";
 
 export default function CreateVideoPage() {
-  const [modelImage, setModelImage] = useState<string | null>(null)
-  const [prompt, setPrompt] = useState("")
-  const [duration, setDuration] = useState([5])
-  const [motion, setMotion] = useState("orta")
-  const [style, setStyle] = useState("profesyonel")
-  const [isGenerating, setIsGenerating] = useState(false)
-  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null)
+  const [modelImage, setModelImage] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [duration, setDuration] = useState([5]);
+  const [motion, setMotion] = useState("orta");
+  const [style, setStyle] = useState("profesyonel");
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedVideo, setGeneratedVideo] = useState<string | null>(null);
 
-  const imageInputRef = useRef<HTMLInputElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const tryOnResult = sessionStorage.getItem("tryOnResult")
+    const tryOnResult = sessionStorage.getItem("tryOnResult");
     if (tryOnResult) {
-      setModelImage(tryOnResult)
-      sessionStorage.removeItem("tryOnResult")
+      setModelImage(tryOnResult);
+      sessionStorage.removeItem("tryOnResult");
     }
-  }, [])
+  }, []);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
+    const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader()
+      const reader = new FileReader();
       reader.onloadend = () => {
-        setModelImage(reader.result as string)
-      }
-      reader.readAsDataURL(file)
+        setModelImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
     }
-  }
+  };
 
   const handleGenerate = async () => {
-    if (!modelImage) return
+    if (!modelImage) return;
 
-    setIsGenerating(true)
-    setGeneratedVideo(null)
+    setIsGenerating(true);
+    // REMOVED: setGeneratedVideo(null) - Keeping the previous video to prevent unmounting crash
 
     try {
-      console.log("[v0] Starting video generation request...")
+      console.log("[v0] Starting video generation request...");
 
       const response = await fetch("/api/generate-video", {
         method: "POST",
@@ -64,44 +84,48 @@ export default function CreateVideoPage() {
           motion,
           style,
         }),
-      })
+      });
 
-      const data = await response.json()
+      const data = await response.json();
 
       if (!response.ok) {
-        console.error("[v0] Video generation failed:", data)
-        throw new Error(data.error || "Bir hata oluştu")
+        console.error("[v0] Video generation failed:", data);
+        throw new Error(data.error || "Bir hata oluştu");
       }
 
-      console.log("[v0] Video generated successfully:", data)
-      setGeneratedVideo(data.video)
+      console.log("[v0] Video generated successfully:", data);
+      setGeneratedVideo(data.video);
     } catch (error) {
-      console.error("[v0] Video generation error:", error)
-      alert(error instanceof Error ? error.message : "Video oluşturulurken bir hata oluştu")
+      console.error("[v0] Video generation error:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Video oluşturulurken bir hata oluştu"
+      );
     } finally {
-      setIsGenerating(false)
+      setIsGenerating(false);
     }
-  }
+  };
 
   const handleDownload = async () => {
-    if (!generatedVideo) return
+    if (!generatedVideo) return;
 
     try {
-      const response = await fetch(generatedVideo)
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `stylescape-video-${Date.now()}.mp4`
-      document.body.appendChild(a)
-      a.click()
-      window.URL.revokeObjectURL(url)
-      document.body.removeChild(a)
+      const response = await fetch(generatedVideo);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `stylescape-video-${Date.now()}.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } catch (error) {
-      console.error("[v0] Download error:", error)
-      alert("Video indirilemedi. Lütfen tekrar deneyin.")
+      console.error("[v0] Download error:", error);
+      alert("Video indirilemedi. Lütfen tekrar deneyin.");
     }
-  }
+  };
 
   const brandPrompts = [
     {
@@ -136,7 +160,7 @@ export default function CreateVideoPage() {
         "Model ürünle etkileşimde, lifestyle content",
       ],
     },
-  ]
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -150,7 +174,9 @@ export default function CreateVideoPage() {
               AI Powered Studio
             </Badge>
           </div>
-          <h1 className="mb-2 text-4xl font-bold">Profesyonel Video Stüdyosu</h1>
+          <h1 className="mb-2 text-4xl font-bold">
+            Profesyonel Video Stüdyosu
+          </h1>
           <p className="text-muted-foreground leading-relaxed">
             Markanız için profesyonel kalitede ürün tanıtım videoları oluşturun
           </p>
@@ -162,17 +188,25 @@ export default function CreateVideoPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Model Görseli</CardTitle>
-                <CardDescription>Try-on sonucu veya oluşturduğunuz model görselini yükleyin</CardDescription>
+                <CardDescription>
+                  Try-on sonucu veya oluşturduğunuz model görselini yükleyin
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="aspect-[2/3] overflow-hidden rounded-lg border-2 border-dashed border-border bg-muted">
                   {modelImage ? (
-                    <img src={modelImage || "/placeholder.svg"} alt="Model" className="h-full w-full object-cover" />
+                    <img
+                      src={modelImage || "/placeholder.svg"}
+                      alt="Model"
+                      className="h-full w-full object-cover"
+                    />
                   ) : (
                     <div className="flex h-full items-center justify-center">
                       <div className="text-center">
                         <ImageIcon className="mx-auto mb-2 h-12 w-12 text-muted-foreground" />
-                        <p className="text-sm text-muted-foreground">Model görseli yükleyin</p>
+                        <p className="text-sm text-muted-foreground">
+                          Model görseli yükleyin
+                        </p>
                       </div>
                     </div>
                   )}
@@ -203,7 +237,9 @@ export default function CreateVideoPage() {
             <Card>
               <CardHeader>
                 <CardTitle>Video Ayarları</CardTitle>
-                <CardDescription>Kamera hareketi ve video özelliklerini belirleyin</CardDescription>
+                <CardDescription>
+                  Kamera hareketi ve video özelliklerini belirleyin
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div className="space-y-2">
@@ -221,7 +257,9 @@ export default function CreateVideoPage() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label htmlFor="duration">Video Süresi</Label>
-                    <span className="text-sm text-muted-foreground">{duration[0]} saniye</span>
+                    <span className="text-sm text-muted-foreground">
+                      {duration[0]} saniye
+                    </span>
                   </div>
                   <Slider
                     id="duration"
@@ -256,10 +294,16 @@ export default function CreateVideoPage() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="profesyonel">Profesyonel Stüdyo</SelectItem>
-                        <SelectItem value="dinamik">Dinamik - Enerji</SelectItem>
+                        <SelectItem value="profesyonel">
+                          Profesyonel Stüdyo
+                        </SelectItem>
+                        <SelectItem value="dinamik">
+                          Dinamik - Enerji
+                        </SelectItem>
                         <SelectItem value="minimal">Minimal - Şık</SelectItem>
-                        <SelectItem value="yaratici">Yaratıcı - Sanatsal</SelectItem>
+                        <SelectItem value="yaratici">
+                          Yaratıcı - Sanatsal
+                        </SelectItem>
                         <SelectItem value="lux">Lüks - Premium</SelectItem>
                       </SelectContent>
                     </Select>
@@ -293,7 +337,9 @@ export default function CreateVideoPage() {
                   <Sparkles className="h-5 w-5 text-primary" />
                   Marka İçin Hazır Senaryolar
                 </CardTitle>
-                <CardDescription>Kullanım senaryonuza göre hazır promptlar</CardDescription>
+                <CardDescription>
+                  Kullanım senaryonuza göre hazır promptlar
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {brandPrompts.map((section, sectionIndex) => (
@@ -325,22 +371,44 @@ export default function CreateVideoPage() {
             <Card className="sticky top-20">
               <CardHeader>
                 <CardTitle>Video Önizleme</CardTitle>
-                <CardDescription>Oluşturulan profesyonel video içeriğiniz</CardDescription>
+                <CardDescription>
+                  Oluşturulan profesyonel video içeriğiniz
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 {generatedVideo ? (
                   <div className="space-y-4">
-                    <div className="aspect-[2/3] overflow-hidden rounded-lg border-2 border-border bg-muted">
-                      <video src={generatedVideo} controls className="h-full w-full object-cover">
+                    <div className="relative aspect-[2/3] overflow-hidden rounded-lg border-2 border-border bg-muted">
+                      <video
+                        src={generatedVideo}
+                        controls
+                        className={`h-full w-full object-cover transition-opacity duration-300 ${
+                          isGenerating ? "opacity-50" : "opacity-100"
+                        }`}
+                      >
                         Tarayıcınız video etiketini desteklemiyor.
                       </video>
+                      {isGenerating && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 backdrop-blur-[2px]">
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="h-8 w-8 animate-spin text-white" />
+                            <p className="text-xs font-medium text-white drop-shadow-md">
+                              Video güncelleniyor...
+                            </p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <Button onClick={handleDownload} className="flex-1 gap-2">
                         <Download className="h-4 w-4" />
                         İndir
                       </Button>
-                      <Button variant="outline" onClick={() => setGeneratedVideo(null)} className="flex-1">
+                      <Button
+                        variant="outline"
+                        onClick={() => setGeneratedVideo(null)}
+                        className="flex-1"
+                      >
                         Yeni Video
                       </Button>
                     </div>
@@ -351,8 +419,12 @@ export default function CreateVideoPage() {
                       {isGenerating ? (
                         <>
                           <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-primary" />
-                          <p className="font-medium text-muted-foreground">Video üretiliyor...</p>
-                          <p className="mt-2 text-xs text-muted-foreground">Bu işlem 1-2 dakika sürebilir</p>
+                          <p className="font-medium text-muted-foreground">
+                            Video üretiliyor...
+                          </p>
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Bu işlem 1-2 dakika sürebilir
+                          </p>
                         </>
                       ) : (
                         <>
@@ -381,32 +453,44 @@ export default function CreateVideoPage() {
             <ul className="grid gap-3 sm:grid-cols-2">
               <li className="flex gap-2 text-sm">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Yüksek çözünürlüklü model görseli kullanın</span>
+                <span className="text-muted-foreground">
+                  Yüksek çözünürlüklü model görseli kullanın
+                </span>
               </li>
               <li className="flex gap-2 text-sm">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Kamera hareketini detaylı tanımlayın</span>
+                <span className="text-muted-foreground">
+                  Kamera hareketini detaylı tanımlayın
+                </span>
               </li>
               <li className="flex gap-2 text-sm">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">E-ticaret için 5-10 saniye idealdir</span>
+                <span className="text-muted-foreground">
+                  E-ticaret için 5-10 saniye idealdir
+                </span>
               </li>
               <li className="flex gap-2 text-sm">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Sosyal medya için hızlı ve dinamik tercih edin</span>
+                <span className="text-muted-foreground">
+                  Sosyal medya için hızlı ve dinamik tercih edin
+                </span>
               </li>
               <li className="flex gap-2 text-sm">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Lookbook için sinematik ve yavaş hareketler</span>
+                <span className="text-muted-foreground">
+                  Lookbook için sinematik ve yavaş hareketler
+                </span>
               </li>
               <li className="flex gap-2 text-sm">
                 <span className="text-primary">•</span>
-                <span className="text-muted-foreground">Farklı stiller deneyerek markanıza uygun olanı bulun</span>
+                <span className="text-muted-foreground">
+                  Farklı stiller deneyerek markanıza uygun olanı bulun
+                </span>
               </li>
             </ul>
           </CardContent>
         </Card>
       </main>
     </div>
-  )
+  );
 }
