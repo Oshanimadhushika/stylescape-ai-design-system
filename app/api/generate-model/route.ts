@@ -108,7 +108,6 @@ OUTPUT: A single, professional-quality photograph.`;
       console.error("[v0] No image found in response.");
       throw new Error("Görsel oluşturulamadı.");
     }
-
     console.log("[v0] Image generated successfully");
 
     return Response.json({
