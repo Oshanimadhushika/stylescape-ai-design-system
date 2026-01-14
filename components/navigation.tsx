@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Sparkles, ImageIcon, Video, Menu, Layers } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { cn } from "@/lib/utils";
 
 const navItems = [
   {
@@ -52,14 +53,18 @@ export function Navigation() {
           {navItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href}>
-                <Button
-                  variant={pathname === item.href ? "secondary" : "ghost"}
-                  className="gap-2"
-                >
-                  <Icon className="h-4 w-4" />
-                  {item.title}
-                </Button>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  buttonVariants({
+                    variant: pathname === item.href ? "secondary" : "ghost",
+                  }),
+                  "gap-2"
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                {item.title}
               </Link>
             );
           })}
@@ -78,14 +83,18 @@ export function Navigation() {
               {navItems.map((item) => {
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href}>
-                    <Button
-                      variant={pathname === item.href ? "secondary" : "ghost"}
-                      className="w-full justify-start gap-2"
-                    >
-                      <Icon className="h-4 w-4" />
-                      {item.title}
-                    </Button>
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      buttonVariants({
+                        variant: pathname === item.href ? "secondary" : "ghost",
+                      }),
+                      "w-full justify-start gap-2"
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {item.title}
                   </Link>
                 );
               })}

@@ -277,10 +277,18 @@ export default function TryOnPage() {
           <CardContent>
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {STUDIO_PRESETS.map((preset) => (
-                <button
+                <div
                   key={preset.name}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => handlePresetChange(preset.name)}
-                  className={`rounded-lg border p-4 text-left transition-all hover:border-primary hover:shadow-md ${
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      handlePresetChange(preset.name);
+                    }
+                  }}
+                  className={`cursor-pointer rounded-lg border p-4 text-left transition-all hover:border-primary hover:shadow-md ${
                     selectedPreset === preset.name
                       ? "border-primary bg-primary/10 shadow-md"
                       : "border-border bg-background"
@@ -290,7 +298,7 @@ export default function TryOnPage() {
                   <p className="text-xs text-muted-foreground leading-relaxed">
                     {preset.description}
                   </p>
-                </button>
+                </div>
               ))}
             </div>
           </CardContent>
@@ -346,10 +354,18 @@ export default function TryOnPage() {
                     <ScrollArea className="h-[200px] rounded-md border border-border">
                       <div className="space-y-2 p-2">
                         {savedModels.map((model) => (
-                          <button
+                          <div
                             key={model.id}
+                            role="button"
+                            tabIndex={0}
                             onClick={() => handleSelectSavedModel(model)}
-                            className={`flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent ${
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                handleSelectSavedModel(model);
+                              }
+                            }}
+                            className={`flex w-full cursor-pointer items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent ${
                               selectedModel?.id === model.id
                                 ? "border-primary bg-accent"
                                 : "border-border"
@@ -380,7 +396,7 @@ export default function TryOnPage() {
                                 )}
                               </div>
                             </div>
-                          </button>
+                          </div>
                         ))}
                       </div>
                     </ScrollArea>
