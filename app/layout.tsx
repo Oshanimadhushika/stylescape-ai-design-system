@@ -1,11 +1,11 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import "./globals.css"
+import type React from "react";
+import type { Metadata } from "next";
+import { Geist, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import "./globals.css";
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+const _geist = Geist({ subsets: ["latin"] });
+const _geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "StyleScape - AI Fotoğraf Stüdyosu",
@@ -29,19 +29,25 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
-}
+  other: {
+    google: "notranslate",
+  },
+};
 
 export default function RootLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode
+  children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr">
-      <body className={`font-sans antialiased`}>
+    <html lang="tr" suppressHydrationWarning>
+      <body
+        className={`font-sans antialiased notranslate`}
+        suppressHydrationWarning
+      >
         {children}
         <Analytics />
       </body>
     </html>
-  )
+  );
 }
