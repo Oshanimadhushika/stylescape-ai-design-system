@@ -29,6 +29,9 @@ export const metadata: Metadata = {
     ],
     apple: "/apple-icon.png",
   },
+  other: {
+    google: "notranslate",
+  },
 };
 
 export default function RootLayout({
@@ -38,7 +41,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" suppressHydrationWarning>
-      <body className={`font-sans antialiased`} suppressHydrationWarning>
+      <body
+        className={`font-sans antialiased notranslate`}
+        suppressHydrationWarning
+      >
         {children}
         <Analytics />
       </body>
