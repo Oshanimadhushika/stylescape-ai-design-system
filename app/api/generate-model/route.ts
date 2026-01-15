@@ -58,6 +58,9 @@ export async function POST(req: Request) {
 CRITICAL CONSISTENCY REQUIREMENTS:
 - Generate a high-resolution, professional fashion model photograph
 - Positioned for optimal clothing overlay and virtual try-on compatibility
+- NO TEXT, NO WATERMARKS, NO LABELS anywhere in the image
+- Clean background with NO writing or typography
+- Pure photographic output only
 
 PHYSICAL SPECIFICATIONS:
 - Gender: ${gender}, Age: ${ageRange}, Height: ${height}, Body: ${bodyType}, Size: ${clothingSize}
@@ -74,7 +77,11 @@ ${
     : ""
 }
 
-OUTPUT: A single, professional-quality photograph.`;
+CRITICAL OUTPUT REQUIREMENTS:
+- A single, professional-quality photograph
+- NO text, watermarks, labels, or typography of any kind
+- Clean, professional background
+- Pure photographic content only`;
     }
 
     console.log("[v0] Generating image with Direct Gemini SDK...");
