@@ -201,13 +201,19 @@ export default function MixMatchPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Mix & Match failed");
-
       const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data.error || "Mix & Match failed";
+        throw new Error(errorMessage);
+      }
+
       setResult(data.resultImage);
     } catch (error) {
       console.error("Mix & Match error:", error);
-      alert("Kombin oluşturulamadı. Lütfen tekrar deneyin.");
+      const errorMessage =
+        error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu";
+      alert(`Kombin oluşturulamadı: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
@@ -616,7 +622,7 @@ export default function MixMatchPage() {
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Kombin Oluşturuluyor...
+                  Kombin Oluşturuluyor (AI ile)...
                 </>
               ) : (
                 <>
@@ -649,7 +655,7 @@ export default function MixMatchPage() {
                           <div className="flex flex-col items-center gap-2">
                             <Loader2 className="h-8 w-8 animate-spin text-white" />
                             <p className="text-xs font-medium text-white drop-shadow-md">
-                              Kombin güncelleniyor...
+                              AI ile kombin oluşturuluyor...
                             </p>
                           </div>
                         </div>
