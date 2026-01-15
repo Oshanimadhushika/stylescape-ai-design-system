@@ -221,13 +221,16 @@ CRITICAL REQUIREMENTS:
 - Match the EXACT colors, patterns, styles, and features described
 - Do NOT substitute or modify any clothing items
 - Do NOT add any clothing items not listed above
+- NO TEXT, NO WATERMARKS, NO LABELS anywhere in the image
+- Clean background with NO writing or typography
 - Professional fashion photography quality
 - Full body shot showing the complete outfit clearly
 - High resolution and sharp details
 - Studio-quality composition and lighting
 - Fashion editorial style
+- Pure photographic content only
 
-OUTPUT: A single professional fashion photograph showing the model wearing EXACTLY the specified clothing items with all their described characteristics.`;
+OUTPUT: A single professional fashion photograph showing the model wearing EXACTLY the specified clothing items with all their described characteristics. NO text, watermarks, or labels of any kind.`;
 
     console.log("[v0] Generating image with detailed clothing analysis...");
 
