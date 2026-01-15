@@ -622,7 +622,7 @@ export default function MixMatchPage() {
               {isProcessing ? (
                 <>
                   <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                  Kombin Oluşturuluyor...
+                  Kombin Oluşturuluyor (AI ile)...
                 </>
               ) : (
                 <>
@@ -655,7 +655,7 @@ export default function MixMatchPage() {
                           <div className="flex flex-col items-center gap-2">
                             <Loader2 className="h-8 w-8 animate-spin text-white" />
                             <p className="text-xs font-medium text-white drop-shadow-md">
-                              Kombin güncelleniyor...
+                              AI ile kombin oluşturuluyor...
                             </p>
                           </div>
                         </div>
