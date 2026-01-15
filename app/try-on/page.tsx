@@ -13,6 +13,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Upload,
   Loader2,
@@ -25,6 +26,9 @@ import {
   Shirt,
   Camera,
   Wand2,
+  Edit3,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { getSupabase, type Model } from "@/lib/supabase";
@@ -96,6 +100,14 @@ export default function TryOnPage() {
   const [lighting, setLighting] = useState<string>("soft-even");
   const [environment, setEnvironment] = useState<string>("white-backdrop");
 
+  // Revision state
+  const [revisionMode, setRevisionMode] = useState(false);
+  const [revisionInstruction, setRevisionInstruction] = useState("");
+  const [versionHistory, setVersionHistory] = useState<
+    Array<{ version: number; image: string; instruction: string }>
+  >([]);
+  const [currentVersion, setCurrentVersion] = useState(0);
+
   const modelInputRef = useRef<HTMLInputElement>(null);
   const clothingInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -130,14 +142,19 @@ export default function TryOnPage() {
       console.log("[v0] Supabase response:", { data, error });
 
       if (error) {
-        console.error("[v0] Supabase error:", error);
+        console.error(
+          "[v0] Supabase error detail:",
+          JSON.stringify(error, null, 2)
+        );
         throw error;
       }
 
       console.log("[v0] Successfully loaded models:", data?.length || 0);
       setSavedModels(data || []);
-    } catch (error) {
+    } catch (error: any) {
       console.error("[v0] Load models error:", error);
+      console.error("[v0] Error message:", error.message);
+      console.error("[v0] Error hint:", error.hint);
       setSavedModels([]);
     } finally {
       console.log("[v0] Finished loading models, setting loading to false");
@@ -198,6 +215,11 @@ export default function TryOnPage() {
       }
 
       setResult(data.image);
+      // Initialize version history with first result
+      setVersionHistory([
+        { version: 1, image: data.image, instruction: "Initial generation" },
+      ]);
+      setCurrentVersion(1);
     } catch (error) {
       console.error("[v0] Try-on error:", error);
       alert(
@@ -210,18 +232,81 @@ export default function TryOnPage() {
     }
   };
 
+  const handleRevise = async () => {
+    if (!result || !revisionInstruction.trim()) return;
+
+    setIsProcessing(true);
+
+    try {
+      const modelContext = selectedModel?.context_prompt || null;
+
+      const response = await fetch("/api/try-on", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          modelImage,
+          clothingImage,
+          modelContext,
+          previousResult: result,
+          revisionInstructions: revisionInstruction,
+          studioSettings: {
+            pose,
+            angle,
+            lighting,
+            environment,
+          },
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Bir hata oluştu");
+      }
+
+      const newVersion = currentVersion + 1;
+      setResult(data.image);
+      setVersionHistory([
+        ...versionHistory,
+        {
+          version: newVersion,
+          image: data.image,
+          instruction: revisionInstruction,
+        },
+      ]);
+      setCurrentVersion(newVersion);
+      setRevisionInstruction("");
+      setRevisionMode(false);
+    } catch (error) {
+      console.error("[v0] Revision error:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Revizyon sırasında bir hata oluştu"
+      );
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleReset = () => {
-    setModelImage(null);
-    setClothingImage(null);
     setResult(null);
-    setSelectedModel(null);
-    setSelectedPreset("");
-    setPose("front-straight");
-    setAngle("eye-level");
-    setLighting("soft-even");
-    setEnvironment("white-backdrop");
-    if (modelInputRef.current) modelInputRef.current.value = "";
-    if (clothingInputRef.current) clothingInputRef.current.value = "";
+    setVersionHistory([]);
+    setCurrentVersion(0);
+    setRevisionMode(false);
+    setRevisionInstruction("");
+    // Immediately regenerate with the same inputs
+    handleTryOn();
+  };
+
+  const navigateToVersion = (version: number) => {
+    const versionData = versionHistory.find((v) => v.version === version);
+    if (versionData) {
+      setResult(versionData.image);
+      setCurrentVersion(version);
+    }
   };
 
   const handleDownload = () => {
@@ -570,30 +655,107 @@ export default function TryOnPage() {
                 ) : null}
 
                 {result && (
-                  <div className="grid grid-cols-2 gap-3 pt-2 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <Button
-                      onClick={handleDownload}
-                      variant="outline"
-                      className="h-11"
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      İndir
-                    </Button>
-                    <Button
-                      variant="outline"
-                      onClick={handleReset}
-                      className="h-11"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-2" />
-                      Yeniden
-                    </Button>
-                    <Button
-                      onClick={handleCreateVideo}
-                      className="col-span-2 h-11 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
-                    >
-                      <Video className="h-4 w-4 mr-2" />
-                      Video Oluştur
-                    </Button>
+                  <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    {/* Version Navigator */}
+                    {versionHistory.length > 1 && (
+                      <div className="flex items-center justify-between p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigateToVersion(currentVersion - 1)}
+                          disabled={currentVersion <= 1}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm font-medium">
+                          v{currentVersion} / {versionHistory.length}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => navigateToVersion(currentVersion + 1)}
+                          disabled={currentVersion >= versionHistory.length}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Revision Panel */}
+                    {revisionMode ? (
+                      <div className="space-y-2 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                        <Label
+                          htmlFor="revision-instruction"
+                          className="text-sm font-medium"
+                        >
+                          Revizyon Talimatı
+                        </Label>
+                        <Textarea
+                          id="revision-instruction"
+                          value={revisionInstruction}
+                          onChange={(e) =>
+                            setRevisionInstruction(e.target.value)
+                          }
+                          placeholder="Örn: 'make hair blonde', 'better lighting', 'brighter colors'"
+                          className="min-h-[80px]"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={handleRevise}
+                            disabled={isProcessing}
+                            className="flex-1"
+                          >
+                            <Wand2 className="h-4 w-4 mr-2" />
+                            Revize Et
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setRevisionMode(false);
+                              setRevisionInstruction("");
+                            }}
+                          >
+                            İptal
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Button
+                        onClick={() => setRevisionMode(true)}
+                        variant="outline"
+                        className="w-full h-11"
+                      >
+                        <Edit3 className="h-4 w-4 mr-2" />
+                        Revize Et (v{currentVersion})
+                      </Button>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="grid grid-cols-2 gap-3 pt-2">
+                      <Button
+                        onClick={handleDownload}
+                        variant="outline"
+                        className="h-11"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        İndir
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={handleReset}
+                        className="h-11"
+                      >
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Yeniden
+                      </Button>
+                      <Button
+                        onClick={handleCreateVideo}
+                        className="col-span-2 h-11 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
+                      >
+                        <Video className="h-4 w-4 mr-2" />
+                        Video Oluştur
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

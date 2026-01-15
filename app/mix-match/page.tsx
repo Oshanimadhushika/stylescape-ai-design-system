@@ -320,7 +320,8 @@ export default function MixMatchPage() {
 
   const handleCreateVideo = () => {
     if (!result) return;
-    router.push(`/create-video?image=${encodeURIComponent(result)}`);
+    sessionStorage.setItem("tryOnResult", result);
+    router.push("/create-video");
   };
 
   const getLayerLabel = (type: ClothingLayer["type"]) => {
