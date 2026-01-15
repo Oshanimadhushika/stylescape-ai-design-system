@@ -201,13 +201,19 @@ export default function MixMatchPage() {
         }),
       });
 
-      if (!response.ok) throw new Error("Mix & Match failed");
-
       const data = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = data.error || "Mix & Match failed";
+        throw new Error(errorMessage);
+      }
+
       setResult(data.resultImage);
     } catch (error) {
       console.error("Mix & Match error:", error);
-      alert("Kombin oluşturulamadı. Lütfen tekrar deneyin.");
+      const errorMessage =
+        error instanceof Error ? error.message : "Bilinmeyen bir hata oluştu";
+      alert(`Kombin oluşturulamadı: ${errorMessage}`);
     } finally {
       setIsProcessing(false);
     }
