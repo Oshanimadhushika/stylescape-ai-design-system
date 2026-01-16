@@ -1,27 +1,44 @@
 import { GoogleGenAI } from "@google/genai";
+import fs from 'fs';
+import path from 'path';
 
-console.log("Initializing GoogleGenAI...");
-const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY });
-
-async function listModels() {
+let apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+if (!apiKey) {
     try {
-        console.log("Fetching model list...");
-        const response = await ai.models.list();
-
-        console.log("\n--- Available Models ---");
-        if (response.models) {
-            response.models.forEach(model => {
-                console.log(`\nName: ${model.name}`);
-                console.log(`Display Name: ${model.displayName}`);
-                console.log(`Supported Generation Methods: ${model.supportedGenerationMethods?.join(", ")}`);
-            });
-        } else {
-            console.log("No models found in response.");
+        const envPath = path.resolve('.env');
+        if (fs.existsSync(envPath)) {
+            const envContent = fs.readFileSync(envPath, 'utf8');
+            const match = envContent.match(/^(?:GOOGLE_API_KEY|GEMINI_API_KEY)=(.*)$/m);
+            if (match) {
+                apiKey = match[1].trim();
+            }
         }
-
-    } catch (error) {
-        console.error("Error listing models:", error);
+    } catch (e) {
+        console.error(e);
     }
 }
 
-listModels();
+const ai = new GoogleGenAI({ apiKey });
+
+async function run() {
+    console.log("Listing models...");
+    try {
+        // The SDK might not have a clean listModels exposed directly on 'ai' or 'ai.models', let's check
+        // standard is usually ai.models.list()
+        const response = await ai.models.list();
+        // response typically has .models containing the list
+        if (response && response.models) {
+            response.models.forEach(m => {
+                if (m.name.includes("image") || m.name.includes("vision") || m.name.includes("veo")) {
+                    console.log(m.name, m.supportedGenerationMethods);
+                }
+            });
+        } else {
+            console.log("Response structure unknown:", response);
+        }
+    } catch (error) {
+        console.error("Error listing models:", error.message);
+    }
+}
+
+run();
