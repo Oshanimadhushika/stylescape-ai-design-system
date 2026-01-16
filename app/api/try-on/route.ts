@@ -1,7 +1,150 @@
-import { fal } from "@fal-ai/client";
+import { GoogleGenAI } from "@google/genai";
 import { NextResponse } from "next/server";
+import fs from "fs";
+import path from "path";
+import os from "os";
 
 export const maxDuration = 60;
+
+// Helper to handle base64 parts for Gemini
+function partFromBase64(base64String: string) {
+  let data = base64String;
+  if (data.includes("base64,")) {
+    data = data.split("base64,")[1];
+  }
+  return {
+    inlineData: {
+      data: data,
+      mimeType: "image/png",
+    },
+  };
+}
+
+// Helper to safely extract text from Gemini response
+function getText(response: any): string {
+  try {
+    if (response.text && typeof response.text === "function") {
+      return response.text();
+    }
+    // Handle @google/genai v0.1+ structure
+    if (response.candidates && response.candidates.length > 0) {
+      const candidate = response.candidates[0];
+      if (
+        candidate.content &&
+        candidate.content.parts &&
+        candidate.content.parts.length > 0
+      ) {
+        return candidate.content.parts[0].text || "";
+      }
+    }
+    return "";
+  } catch (e) {
+    console.error("Error extracting text from response:", e);
+    return "";
+  }
+}
+
+async function analyzeImages(
+  ai: GoogleGenAI,
+  modelImage: string,
+  clothingImage: string,
+  settings: any
+) {
+  const modelPart = partFromBase64(modelImage);
+  const clothPart = partFromBase64(clothingImage);
+
+  const prompt = `
+    You are a professional fashion photographer and stylist.
+    Task: Create a highly detailed image generation prompt for a virtual try-on.
+    
+    Input 1: Model Image (The person)
+    Input 2: Clothing Image (The garment to be worn)
+    
+    Settings:
+    - Pose: ${settings?.pose || "same as model"}
+    - Lighting: ${settings?.lighting || "natural"}
+    - Environment: ${settings?.environment || "studio"}
+    
+    Instructions:
+    1. Analyze the Model: Describe appearance, gender, body type, hair, facial features, and current pose detailedly.
+    2. Analyze the Clothing: Describe the garment in extreme detail (color, fabric, texture, cut, pattern).
+    3. Output ONE cohesive prompt: Describe the MODEL wearing the CLOTHING.
+    - Ensure the face and body features match the Model Image exactly.
+    - Ensure the clothing matches the Clothing Image exactly.
+    - Apply the requested lighting and environment.
+    - The style should be: "Photorealistic, 4k, high fashion pricing".
+    
+    Output ONLY the prompt text, no explanations.
+  `;
+
+  // Use Gemini 2.0 Flash Exp (verified working)
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash-exp",
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }, modelPart, clothPart],
+      },
+    ],
+  });
+
+  const text = getText(response);
+  return text || "A model wearing fashion clothing.";
+}
+
+async function analyzeForRevision(
+  ai: GoogleGenAI,
+  currentImage: string,
+  instructions: string
+) {
+  const imagePart = partFromBase64(currentImage);
+  const prompt = `
+      I have this generated fashion image.
+      User wants to revise it with: "${instructions}".
+      
+      Write a full, new image generation prompt that describes the image but incorporates the user's changes.
+      Keep everything else (pose, model identity, unaffected clothing parts) as close to the original as possible.
+      Output ONLY the new prompt.
+    `;
+
+  // Use Gemini 2.0 Flash Exp (verified working)
+  const response = await ai.models.generateContent({
+    model: "gemini-2.0-flash-exp",
+    contents: [
+      {
+        role: "user",
+        parts: [{ text: prompt }, imagePart],
+      },
+    ],
+  });
+
+  const text = getText(response);
+  return text || instructions;
+}
+
+async function generateImage(ai: GoogleGenAI, prompt: string): Promise<string> {
+  // UPDATED: Use fast model which was verified to work
+  const response = await ai.models.generateImages({
+    model: "imagen-4.0-fast-generate-001",
+    prompt: prompt,
+    config: {
+      numberOfImages: 1,
+      aspectRatio: "3:4",
+      safetyFilterLevel: "BLOCK_LOW_AND_ABOVE",
+      personGeneration: "ALLOW_ADULT",
+    } as any,
+  });
+
+  if (response.generatedImages && response.generatedImages.length > 0) {
+    const img = response.generatedImages[0];
+    // Ensure we return a data URL
+    const b64 = img.image?.imageBytes;
+    if (!b64) throw new Error("Generative AI produced an empty image result.");
+    return `data:image/png;base64,${b64}`;
+  }
+
+  throw new Error("No image generated.");
+}
 
 export async function POST(req: Request) {
   try {
@@ -14,29 +157,56 @@ export async function POST(req: Request) {
       revisionInstructions,
     } = await req.json();
 
-    console.log("[v0] Try-on request received");
+    console.log("[v0] Try-on request received (Gemini Powered)");
 
+    const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error:
+            "GOOGLE_API_KEY eksik. Lütfen ortam değişkenlerini kontrol edin.",
+        },
+        { status: 500 }
+      );
+    }
+    const ai = new GoogleGenAI({ apiKey });
+
+    // --- REVISION MODE ---
     if (previousResult && revisionInstructions) {
       console.log("[v0] Revision mode:", revisionInstructions);
+      try {
+        const description = await analyzeForRevision(
+          ai,
+          previousResult,
+          revisionInstructions
+        );
+        console.log("[v0] Revised Prompt:", description);
+
+        try {
+          const newImage = await generateImage(ai, description);
+          return NextResponse.json({ image: newImage });
+        } catch (genError: any) {
+          console.error(
+            "[v0] Revision Image Generation failed:",
+            genError.message
+          );
+          return NextResponse.json({
+            image: null,
+            description: description,
+            info: "Image generation skipped (Billing/Quota limits). Showing revised prompt.",
+            isFallback: true,
+          });
+        }
+      } catch (error: any) {
+        console.error("[v0] Revision error:", error);
+        return NextResponse.json(
+          { error: `Revizyon hatası: ${error.message}` },
+          { status: 500 }
+        );
+      }
     }
 
-    console.log(
-      "[v0] Model Image Type:",
-      modelImage
-        ? modelImage.startsWith("data:")
-          ? "Data URL"
-          : "URL"
-        : "Missing"
-    );
-    console.log(
-      "[v0] Clothing Image Type:",
-      clothingImage
-        ? clothingImage.startsWith("data:")
-          ? "Data URL"
-          : "URL"
-        : "Missing"
-    );
-
+    // --- STANDARD TRY-ON MODE ---
     if (!modelImage || !clothingImage) {
       return NextResponse.json(
         { error: "Hem manken hem de kıyafet resmi gereklidir" },
@@ -44,199 +214,31 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!process.env.FAL_KEY) {
-      console.error("[v0] FAL_KEY environment variable is missing");
-      return NextResponse.json(
-        {
-          error: "FAL_KEY eksik. Lütfen v0 vars bölümünden FAL_KEY ekleyin.",
-        },
-        { status: 500 }
-      );
-    }
+    console.log("[v0] Starting Gemini Analysis Phase...");
 
-    // Handle revisions with text-guided image editing
-    if (previousResult && revisionInstructions) {
-      console.log("[v0] Processing revision with Fal AI image-to-image...");
-      console.log("[v0] Revision instruction:", revisionInstructions);
+    // Step 1: Analyze Images with Gemini 2.0 Flash to get a description
+    const analysis = await analyzeImages(
+      ai,
+      modelImage,
+      clothingImage,
+      studioSettings
+    );
+    console.log("[v0] Analysis complete. Prompt:", analysis);
 
-      fal.config({
-        credentials: process.env.FAL_KEY,
-      });
-
-      try {
-        // Upload the previous result to Fal storage
-        const uploadBase64Image = async (
-          base64Data: string
-        ): Promise<string> => {
-          if (!base64Data.startsWith("data:")) return base64Data;
-          const matches = base64Data.match(
-            /^data:([A-Za-z-+\/]+);base64,(.+)$/
-          );
-          if (!matches || matches.length !== 3) {
-            throw new Error("Invalid base64 string");
-          }
-          const contentType = matches[1];
-          const buffer = Buffer.from(matches[2], "base64");
-          const blob = new Blob([buffer], { type: contentType });
-          return await fal.storage.upload(blob);
-        };
-
-        const imageUrl = await uploadBase64Image(previousResult);
-        console.log("[v0] Previous image uploaded:", imageUrl);
-
-        // Use FLUX img2img for text-guided editing
-        const editPrompt = `${revisionInstructions}. IMPORTANT: Keep the clothing, outfit, and overall composition exactly the same. Only modify what is specifically requested.`;
-
-        const result: any = await fal.subscribe(
-          "fal-ai/flux/dev/image-to-image",
-          {
-            input: {
-              image_url: imageUrl,
-              prompt: editPrompt,
-              strength: 0.5, // Lower strength = more preservation of original
-              num_inference_steps: 28,
-              guidance_scale: 3.5,
-            },
-            logs: true,
-            onQueueUpdate: (update) => {
-              if (update.status === "IN_PROGRESS") {
-                update.logs.map((log) => log.message).forEach(console.log);
-              }
-            },
-          }
-        );
-
-        if (
-          !result.data ||
-          !result.data.images ||
-          result.data.images.length === 0
-        ) {
-          console.error("[v0] No image in revision response", result);
-          throw new Error("Revizyon görüntüsü oluşturulamadı");
-        }
-
-        console.log("[v0] Revision completed successfully");
-        return NextResponse.json({
-          image: result.data.images[0].url,
-        });
-      } catch (revisionError: any) {
-        console.error("[v0] Revision error:", revisionError);
-        return NextResponse.json(
-          {
-            error: `Revizyon hatası: ${
-              revisionError?.message || "Bilinmeyen hata"
-            }`,
-          },
-          { status: 500 }
-        );
-      }
-    }
-
-    // Normal try-on flow (no revision)
-    console.log("[v0] Starting Virtual Try-On with fal.ai idm-vton...");
-
-    // Configure fal client
-    fal.config({
-      credentials: process.env.FAL_KEY,
-    });
-
-    // Helper to upload base64 to Fal storage
-    const uploadBase64Image = async (base64Data: string): Promise<string> => {
-      try {
-        // If it's already a URL, return it
-        if (!base64Data.startsWith("data:")) return base64Data;
-
-        // Convert base64 to blob/buffer
-        const matches = base64Data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
-
-        if (!matches || matches.length !== 3) {
-          throw new Error("Invalid base64 string");
-        }
-
-        const contentType = matches[1];
-        const buffer = Buffer.from(matches[2], "base64");
-        const blob = new Blob([buffer], { type: contentType });
-
-        const url = await fal.storage.upload(blob);
-        return url;
-      } catch (error) {
-        console.error("Upload error:", error);
-        throw error;
-      }
-    };
-
-    console.log("[v0] Uploading images to Fal storage...");
-    let modelImageUrl, clothingImageUrl;
+    // Step 2: Generate Image with Imagen
+    console.log("[v0] Starting Generation Phase...");
     try {
-      [modelImageUrl, clothingImageUrl] = await Promise.all([
-        uploadBase64Image(modelImage),
-        uploadBase64Image(clothingImage),
-      ]);
-      console.log("[v0] Images uploaded successfully");
-    } catch (uploadError: any) {
-      console.error("[v0] Image upload failed details:", uploadError);
-      return NextResponse.json(
-        {
-          error: `Resim yükleme hatası: ${
-            uploadError?.message || JSON.stringify(uploadError)
-          }`,
-          details: uploadError,
-        },
-        { status: 500 }
-      );
-    }
+      const generatedImage = await generateImage(ai, analysis);
+      return NextResponse.json({ image: generatedImage });
+    } catch (genError: any) {
+      console.error("[v0] Image Generation failed:", genError.message);
 
-    console.log("[v0] Images uploaded URLs:", {
-      modelImageUrl,
-      clothingImageUrl,
-    });
-
-    // Determine category based on settings or default to upper_body if not specified
-    const category = "upper_body";
-
-    try {
-      console.log("Sending payload to fal-ai/idm-vton:", {
-        human_image_url: modelImageUrl,
-        garment_image_url: clothingImageUrl,
-        description: "clothing item",
-        category,
-      });
-
-      const result: any = await fal.subscribe("fal-ai/idm-vton", {
-        input: {
-          human_image_url: modelImageUrl,
-          garment_image_url: clothingImageUrl,
-          description: "clothing item",
-          category: category,
-          crop: false,
-        },
-        logs: true,
-        onQueueUpdate: (update) => {
-          if (update.status === "IN_PROGRESS") {
-            update.logs.map((log) => log.message).forEach(console.log);
-          }
-        },
-      });
-
-      if (!result.data || !result.data.image) {
-        console.error("[v0] No image in fal response", result);
-        throw new Error("Fal AI yanıtında görsel bulunamadı");
-      }
-
-      console.log("[v0] Try-on generated successfully");
       return NextResponse.json({
-        image: result.data.image.url,
+        image: null,
+        description: analysis,
+        info: "Image generation skipped (Billing/Quota limits). Showing generated prompt.",
+        isFallback: true,
       });
-    } catch (falError: any) {
-      console.error("[v0] Fal AI inference error:", falError);
-      return NextResponse.json(
-        {
-          error: `Fal AI hatası: ${
-            falError?.message || JSON.stringify(falError)
-          }`,
-        },
-        { status: 500 }
-      );
     }
   } catch (error: any) {
     console.error("[v0] General Try-on error:", error);

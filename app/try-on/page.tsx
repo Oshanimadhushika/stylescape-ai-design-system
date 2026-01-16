@@ -29,6 +29,7 @@ import {
   Edit3,
   ChevronLeft,
   ChevronRight,
+  Info,
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { getSupabase, type Model } from "@/lib/supabase";
@@ -108,6 +109,11 @@ export default function TryOnPage() {
   >([]);
   const [currentVersion, setCurrentVersion] = useState(0);
 
+  // Gemini Fallback State
+  const [fallbackDescription, setFallbackDescription] = useState<string | null>(
+    null
+  );
+
   const modelInputRef = useRef<HTMLInputElement>(null);
   const clothingInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
@@ -186,6 +192,8 @@ export default function TryOnPage() {
     if (!modelImage || !clothingImage) return;
 
     setIsProcessing(true);
+    setResult(null);
+    setFallbackDescription(null);
 
     try {
       const modelContext = selectedModel?.context_prompt || null;
@@ -214,12 +222,17 @@ export default function TryOnPage() {
         throw new Error(data.error || "Bir hata oluştu");
       }
 
-      setResult(data.image);
-      // Initialize version history with first result
-      setVersionHistory([
-        { version: 1, image: data.image, instruction: "Initial generation" },
-      ]);
-      setCurrentVersion(1);
+      if (data.isFallback) {
+        setFallbackDescription(data.description);
+        // Do not throw, just show fallback UI
+      } else {
+        setResult(data.image);
+        // Initialize version history with first result
+        setVersionHistory([
+          { version: 1, image: data.image, instruction: "Initial generation" },
+        ]);
+        setCurrentVersion(1);
+      }
     } catch (error) {
       console.error("[v0] Try-on error:", error);
       alert(
@@ -233,7 +246,8 @@ export default function TryOnPage() {
   };
 
   const handleRevise = async () => {
-    if (!result || !revisionInstruction.trim()) return;
+    if ((!result && !fallbackDescription) || !revisionInstruction.trim())
+      return;
 
     setIsProcessing(true);
 
@@ -249,7 +263,7 @@ export default function TryOnPage() {
           modelImage,
           clothingImage,
           modelContext,
-          previousResult: result,
+          previousResult: result || "fallback_placeholder_desc", // Send something if in fallback mode
           revisionInstructions: revisionInstruction,
           studioSettings: {
             pose,
@@ -266,19 +280,24 @@ export default function TryOnPage() {
         throw new Error(data.error || "Bir hata oluştu");
       }
 
-      const newVersion = currentVersion + 1;
-      setResult(data.image);
-      setVersionHistory([
-        ...versionHistory,
-        {
-          version: newVersion,
-          image: data.image,
-          instruction: revisionInstruction,
-        },
-      ]);
-      setCurrentVersion(newVersion);
-      setRevisionInstruction("");
-      setRevisionMode(false);
+      if (data.isFallback) {
+        setFallbackDescription(data.description);
+        alert(data.info || "Görüntü oluşturulamadı, ancak prompt güncellendi.");
+      } else {
+        const newVersion = currentVersion + 1;
+        setResult(data.image);
+        setVersionHistory([
+          ...versionHistory,
+          {
+            version: newVersion,
+            image: data.image,
+            instruction: revisionInstruction,
+          },
+        ]);
+        setCurrentVersion(newVersion);
+        setRevisionInstruction("");
+        setRevisionMode(false);
+      }
     } catch (error) {
       console.error("[v0] Revision error:", error);
       alert(
@@ -293,6 +312,7 @@ export default function TryOnPage() {
 
   const handleReset = () => {
     setResult(null);
+    setFallbackDescription(null);
     setVersionHistory([]);
     setCurrentVersion(0);
     setRevisionMode(false);
@@ -610,6 +630,21 @@ export default function TryOnPage() {
                       </div>
                     )}
                   </>
+                ) : fallbackDescription ? (
+                  <div className="flex h-full flex-col items-center justify-center p-6 text-center text-muted-foreground bg-amber-50 dark:bg-amber-900/20">
+                    <div className="p-4 rounded-full bg-amber-100 dark:bg-amber-800/30 mb-4">
+                      <Info className="h-8 w-8 text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <p className="font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                      Image Generation requires Billing
+                    </p>
+                    <p className="text-sm mb-4">
+                      Here is the detailed prompt that would be used:
+                    </p>
+                    <div className="w-full p-3 bg-white dark:bg-gray-950 rounded border border-amber-200 dark:border-amber-800 text-xs text-left overflow-auto max-h-[200px]">
+                      {fallbackDescription}
+                    </div>
+                  </div>
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center p-6 text-center text-muted-foreground">
                     {isProcessing ? (
@@ -654,7 +689,7 @@ export default function TryOnPage() {
                   </p>
                 ) : null}
 
-                {result && (
+                {(result || fallbackDescription) && (
                   <div className="space-y-3 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Version Navigator */}
                     {versionHistory.length > 1 && (
@@ -736,6 +771,7 @@ export default function TryOnPage() {
                         onClick={handleDownload}
                         variant="outline"
                         className="h-11"
+                        disabled={!result}
                       >
                         <Download className="h-4 w-4 mr-2" />
                         İndir
@@ -750,6 +786,7 @@ export default function TryOnPage() {
                       </Button>
                       <Button
                         onClick={handleCreateVideo}
+                        disabled={!result}
                         className="col-span-2 h-11 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white border-0"
                       >
                         <Video className="h-4 w-4 mr-2" />

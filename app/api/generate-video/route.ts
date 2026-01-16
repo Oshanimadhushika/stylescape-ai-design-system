@@ -95,16 +95,42 @@ export async function POST(req: Request) {
       // 2. Initiate Video Generation
       console.log("[v0] Starting Veo generation...");
 
-      // cast to any to avoid TypeScript complaints about exact SDK signature until types are verified
-      const initialResponse = await (ai.models as any).generateVideos({
-        model: "veo-3.1-generate-preview",
-        prompt: fullPrompt,
-        image_uri: fileUri,
-        config: {
-          aspectRatio: "16:9",
-          resolution: "720p",
-        },
-      });
+      // Retry loop for the initial request (handling Quota/429 on start)
+      let initialResponse: any = null;
+      let attempts = 0;
+      const MAX_RETRIES = 3;
+
+      while (attempts < MAX_RETRIES) {
+        try {
+          attempts++;
+          // cast to any to avoid TypeScript complaints
+          initialResponse = await (ai.models as any).generateVideos({
+            model: "veo-3.1-generate-preview",
+            prompt: fullPrompt,
+            image_uri: fileUri,
+            config: {
+              aspectRatio: "16:9",
+              resolution: "720p",
+            },
+          });
+          // If successful, break the loop
+          break;
+        } catch (startError: any) {
+          const errMsg = startError?.message || "";
+          if (
+            (startError.status === 429 || errMsg.includes("quota")) &&
+            attempts < MAX_RETRIES
+          ) {
+            console.warn(
+              `[v0] Initial quota exceeded (Attempt ${attempts}). Waiting 30s...`
+            );
+            await new Promise((r) => setTimeout(r, 30000)); // Wait 30s
+            continue;
+          }
+          // If other error or max retries reached, throw
+          throw startError;
+        }
+      }
 
       console.log("[v0] Initial response received");
 
@@ -152,66 +178,83 @@ export async function POST(req: Request) {
 
       console.log(`[v0] Operation started: ${operationName}`);
 
-      // 2. Poll for Completion
+      // 2. Poll for Completion with Backoff and Error Handling
       const startTime = Date.now();
-      const MAX_POLL_TIME = 55000; // 55 seconds (leave 5s buffer for 60s timeout)
-      const POLLING_INTERVAL = 3000; // 3 seconds
+      const MAX_POLL_TIME = 90000; // 90 seconds (extended)
+      const POLLING_INTERVAL = 20000; // 20 seconds (Veo is slow, save quota)
 
       while (Date.now() - startTime < MAX_POLL_TIME) {
         await new Promise((r) => setTimeout(r, POLLING_INTERVAL));
 
-        // Poll the operation status
-        // Use getVideosOperationInternal directly because operations.get expects an Operation instance
-        const opStatus = await (
-          ai.operations as any
-        ).getVideosOperationInternal({
-          operationName: operationName,
-        });
-
-        if (opStatus.done) {
-          console.log("[v0] Operation completed!");
-
-          if (opStatus.error) {
-            throw new Error(
-              `Video generation failed: ${
-                opStatus.error.message || JSON.stringify(opStatus.error)
-              }`
-            );
-          }
-
-          const result = opStatus.result || opStatus.response;
-          if (
-            !result ||
-            !result.generatedVideos ||
-            result.generatedVideos.length === 0
-          ) {
-            console.error("[v0] No videos in completion result:", result);
-            throw new Error("Operation completed but no video data found");
-          }
-
-          const videoData = result.generatedVideos[0];
-          const videoBytes =
-            videoData.videoBytes ||
-            videoData.data ||
-            videoData.video?.videoBytes; // Check multiple paths
-
-          if (!videoBytes) {
-            throw new Error("Video bytes missing in response");
-          }
-
-          return Response.json({
-            video: `data:video/mp4;base64,${videoBytes}`,
-            videoName: `stylescape-video-${Date.now()}.mp4`,
+        try {
+          // Poll the operation status
+          const opStatus = await (
+            ai.operations as any
+          ).getVideosOperationInternal({
+            operationName: operationName,
           });
-        }
 
-        console.log("[v0] Still processing...");
+          if (opStatus.done) {
+            console.log("[v0] Operation completed!");
+
+            if (opStatus.error) {
+              console.error(
+                "[v0] Operation failed with error:",
+                opStatus.error
+              );
+              throw new Error(
+                `Video generation failed: ${
+                  opStatus.error.message || JSON.stringify(opStatus.error)
+                }`
+              );
+            }
+
+            const result = opStatus.result || opStatus.response;
+            if (
+              !result ||
+              !result.generatedVideos ||
+              result.generatedVideos.length === 0
+            ) {
+              console.error("[v0] No videos in completion result:", result);
+              throw new Error("Operation completed but no video data found");
+            }
+
+            const videoData = result.generatedVideos[0];
+            const videoBytes =
+              videoData.videoBytes ||
+              videoData.data ||
+              videoData.video?.videoBytes; // Check multiple paths
+
+            if (!videoBytes) {
+              throw new Error("Video bytes missing in response");
+            }
+
+            return Response.json({
+              video: `data:video/mp4;base64,${videoBytes}`,
+              videoName: `stylescape-video-${Date.now()}.mp4`,
+            });
+          }
+
+          console.log("[v0] Still processing...");
+        } catch (pollError: any) {
+          // Handle transient errors (like 429 during polling)
+          if (
+            pollError?.status === 429 ||
+            pollError?.message?.includes("quota")
+          ) {
+            console.warn("[v0] Polling 429 (Quota), waiting longer...");
+            await new Promise((r) => setTimeout(r, 10000)); // Wait extra 10s
+            continue; // Retry polling
+          }
+          // If it's a real error (not 429), rethrow
+          throw pollError;
+        }
       }
 
       return Response.json(
         {
           error:
-            "Video oluşturma zaman aşımına uğradı (60s+). İşlem arka planda devam ediyor olabilir.",
+            "Video oluşturma zaman aşımına uğradı (90s+). İşlem arka planda devam ediyor olabilir.",
         },
         { status: 504 }
       );
