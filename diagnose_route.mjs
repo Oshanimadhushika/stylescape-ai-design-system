@@ -64,8 +64,42 @@ async function run() {
         if (response) console.log("Response keys:", Object.keys(response));
 
         // 4. Access Name
-        const name = response.name;
-        console.log("SUCCESS! Operation Name:", name);
+        const operationName = response.name;
+        console.log("SUCCESS! Operation Name:", operationName);
+
+        // 5. Poll for completion to see result structure
+        console.log("5. Polling for completion...");
+        let done = false;
+        let result = null;
+        let opStatus = null;
+
+        while (!done) {
+            await new Promise(r => setTimeout(r, 10000));
+            opStatus = await (ai.operations).getVideosOperationInternal({
+                operationName: operationName,
+            });
+            console.log("Poll status:", opStatus.done ? "DONE" : "STILL PROCESSING...");
+            if (opStatus.done) {
+                done = true;
+                result = opStatus.result || opStatus.response;
+            }
+        }
+
+        console.log("\n--- COMPLETE OPERATION STATUS ---");
+        console.log(JSON.stringify(opStatus, null, 2));
+
+        console.log("\n--- RESULT STRUCTURE ---");
+        console.log(JSON.stringify(result, null, 2));
+
+        if (result && result.generatedVideos) {
+            console.log("Success! Found", result.generatedVideos.length, "videos");
+            const vid = result.generatedVideos[0];
+            console.log("Video keys:", Object.keys(vid));
+            const bytes = vid.videoBytes || vid.data || (vid.video && vid.video.videoBytes);
+            console.log("Video bytes found:", !!bytes);
+        } else {
+            console.log("FAIL: No generatedVideos in result.");
+        }
 
     } catch (e) {
         console.log("\n!!! ERROR CAUGHT !!!");

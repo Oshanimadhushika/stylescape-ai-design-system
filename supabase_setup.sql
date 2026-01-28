@@ -30,3 +30,32 @@ create policy "Enable read access for all users" on models
 -- Policy for inserting (uploading) models
 create policy "Enable insert access for all users" on models 
   for insert with check (true);
+
+-- Create the outfits table if it doesn't exist
+create table if not exists outfits (
+  id uuid default gen_random_uuid() primary key,
+  name text not null,
+  model_id uuid references models(id) on delete set null,
+  top_clothing_url text,
+  bottom_clothing_url text,
+  outerwear_clothing_url text,
+  accessories_clothing_url text,
+  result_image_url text,
+  studio_settings jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- Enable Row Level Security (RLS) for outfits
+alter table outfits enable row level security;
+
+-- Policy for selecting (reading) outfits
+create policy "Enable read access for all users" on outfits 
+  for select using (true);
+
+-- Policy for inserting (uploading) outfits
+create policy "Enable insert access for all users" on outfits 
+  for insert with check (true);
+
+-- Policy for deleting outfits
+create policy "Enable delete access for all users" on outfits 
+  for delete using (true);
