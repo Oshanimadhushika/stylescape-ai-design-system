@@ -30,7 +30,7 @@ export async function POST(req: Request) {
         {
           error: "Açıklama, revizyon talimatı veya referans görsel gereklidir",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -40,48 +40,33 @@ export async function POST(req: Request) {
     let contextPrompt = "";
 
     if (isRevision) {
-      contextPrompt = `REVISION TASK - MODIFY THE ATTACHED FASHION MODEL IMAGE
-      
-      PREVIOUS MODEL SPECIFICATIONS (FOR CONTEXT):
-      - Gender: ${gender}, Age: ${ageRange}, Height: ${height}, Body: ${bodyType}
-      - Hair: ${hairColor} ${hairStyle}, Tone: ${skinTone}, Style: ${style}
-      
-      REVISION INSTRUCTIONS:
-      ${revisionInstructions}
-      
-      CRITICAL REQUIREMENTS:
-      - Apply the requested changes while keeping the overall quality and composition consistent with the original model's identity.
-      - Output a single, professional-quality fashion photograph.`;
+      contextPrompt = `REVISION TASK: Modify the existing fashion model image.
+The previous model was a ${gender}, around ${ageRange} years old, ${height} height, and ${bodyType} build. 
+Hair: ${hairColor} ${hairStyle}. Skin Tone: ${skinTone}. Style: ${style}.
+
+Please apply the following specific changes:
+${revisionInstructions}
+
+Requirements:
+Maintain the overall quality and identity of the original model.
+Output a single, high-quality photograph.
+Do not include any text, letters, watermarks, or labels in the final image.`;
     } else {
-      contextPrompt = `PROFESSIONAL FASHION MODEL GENERATION - DETAILED SPECIFICATIONS
-
-CRITICAL CONSISTENCY REQUIREMENTS:
-- Generate a high-resolution, professional fashion model photograph
-- Positioned for optimal clothing overlay and virtual try-on compatibility
-- NO TEXT, NO WATERMARKS, NO LABELS anywhere in the image
-- Clean background with NO writing or typography
-- Pure photographic output only
-
-PHYSICAL SPECIFICATIONS:
-- Gender: ${gender}, Age: ${ageRange}, Height: ${height}, Body: ${bodyType}, Size: ${clothingSize}
-- Tone: ${skinTone}, Hair: ${hairColor} ${hairStyle}
-
-STYLE & SETUP:
-- Pose: ${pose}, Environment: ${environment}, Style: ${style}
-
-USER NOTES: ${description}
-
+      contextPrompt = `A professional, high-resolution fashion model photograph. 
+The model is a ${gender}, around ${ageRange} years old, with a ${height} height and ${bodyType} build, wearing size ${clothingSize}. 
+The model has ${skinTone} skin tone and ${hairColor} ${hairStyle} hair. 
+The pose is ${pose}, captured in a ${environment} environment with a ${style} style. 
+${description}
 ${
   referenceImage
-    ? "NOTE: A reference image has been provided by the user to guide the style/pose."
+    ? "The photo should follow the style and pose of the provided reference."
     : ""
 }
 
-CRITICAL OUTPUT REQUIREMENTS:
-- A single, professional-quality photograph
-- NO text, watermarks, labels, or typography of any kind
-- Clean, professional background
-- Pure photographic content only`;
+Important instructions for the output:
+The image must be a clean, pure photographic output of a single model.
+Do not include any text, letters, watermarks, labels, or typography anywhere in the background or on the model.
+The background must be clean and professional without any writing.`;
     }
 
     console.log("[v0] Generating image with Direct Gemini SDK...");
@@ -89,7 +74,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       console.log(
         "[v0] Reference image provided (Base64 length: " +
           referenceImage.length +
-          ")"
+          ")",
       );
       // Note: Current imagen-4.0-generate-001 via this SDK might not support direct image input for generation
       // in the standard text-to-image flow comfortably without looking up specific parameters.
@@ -151,7 +136,7 @@ CRITICAL OUTPUT REQUIREMENTS:
       error instanceof Error ? error.message : "Unknown error";
     return Response.json(
       { error: `Görsel oluşturulamadı: ${errorMessage}` },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -19,7 +19,7 @@ export async function POST(req: Request) {
           error:
             "GOOGLE_API_KEY eksik. Lütfen ortam değişkenlerini kontrol edin.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -29,7 +29,7 @@ export async function POST(req: Request) {
     if (!modelImage) {
       return Response.json(
         { error: "Manken resmi gereklidir" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     // API Key check moved up
@@ -45,11 +45,52 @@ export async function POST(req: Request) {
       }
     }
 
+    // Step 1: Analyze the model image to ensure absolute consistency
+    console.log("[v0] Analyzing model image for consistency...");
+    let modelDescription = "";
+    try {
+      const visionPrompt = `Analyze this fashion photo in extreme detail. Describe:
+1. Physical characteristics of the model: face, features, skin tone, hair color/style.
+2. Exact clothing: describe the attire including fabric, cut, color, and unique patterns.
+3. Pose and lighting.
+Provide a comprehensive description so this EXACT subject and outfit can be recreated in motion.`;
+
+      const visionResult = await ai.models.generateContent({
+        model: "gemini-2.0-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              { text: visionPrompt },
+              {
+                inlineData: {
+                  mimeType: "image/png",
+                  data: imageData,
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      modelDescription = visionResult.text || "";
+      console.log("[v0] Vision analysis complete.");
+    } catch (visionError) {
+      console.error("[v0] Vision analysis failed, falling back:", visionError);
+    }
+
     // Build the video generation prompt
-    const fullPrompt = `${
-      prompt ||
-      "Professional fashion model showcasing outfit with smooth, natural movements"
-    }. ${style ? `Style: ${style}.` : ""} ${
+    const fullPrompt = `STRICT VISUAL CONSISTENCY: The video MUST feature the EXACT subject and outfit described below. 
+DO NOT change the model's face, hair, or clothing details.
+
+SUBJECT DETAILS:
+${modelDescription || "A professional fashion model showcasing outfit."}
+
+VIDEO ACTION: 
+${prompt || "The model showcases the clothing with smooth, natural movements"}.
+
+PHOTOGRAPHY SETTINGS:
+${style ? `Style: ${style}.` : ""} ${
       motion ? `Camera motion: ${motion}.` : ""
     } Professional studio lighting, cinematic quality, high-end fashion photography. Smooth and elegant movement.`;
 
@@ -61,12 +102,12 @@ export async function POST(req: Request) {
 
       const tempFilePath = path.join(
         os.tmpdir(),
-        `veo_input_${Date.now()}.png`
+        `veo_input_${Date.now()}.png`,
       );
 
       await fs.promises.writeFile(
         tempFilePath,
-        Buffer.from(imageData, "base64")
+        Buffer.from(imageData, "base64"),
       );
 
       let fileUri: string;
@@ -122,7 +163,7 @@ export async function POST(req: Request) {
             attempts < MAX_RETRIES
           ) {
             console.warn(
-              `[v0] Initial quota exceeded (Attempt ${attempts}). Waiting 30s...`
+              `[v0] Initial quota exceeded (Attempt ${attempts}). Waiting 30s...`,
             );
             await new Promise((r) => setTimeout(r, 30000)); // Wait 30s
             continue;
@@ -154,7 +195,7 @@ export async function POST(req: Request) {
       if (!operationName) {
         console.error(
           "[v0] Unexpected response structure (No Name):",
-          JSON.stringify(initialResponse, null, 2)
+          JSON.stringify(initialResponse, null, 2),
         );
 
         // Fallback: Check if video was generated synchronously (unlikely for Veo but good safety)
@@ -200,33 +241,58 @@ export async function POST(req: Request) {
             if (opStatus.error) {
               console.error(
                 "[v0] Operation failed with error:",
-                opStatus.error
+                opStatus.error,
               );
               throw new Error(
                 `Video generation failed: ${
                   opStatus.error.message || JSON.stringify(opStatus.error)
-                }`
+                }`,
               );
             }
 
             const result = opStatus.result || opStatus.response;
-            if (
-              !result ||
-              !result.generatedVideos ||
-              result.generatedVideos.length === 0
-            ) {
-              console.error("[v0] No videos in completion result:", result);
-              throw new Error("Operation completed but no video data found");
+            if (!result) {
+              console.error("[v0] No result in completion result:", opStatus);
+              throw new Error("Operation completed but no result found");
             }
 
-            const videoData = result.generatedVideos[0];
+            // Veo 3.1 structure: result.generateVideoResponse.generatedSamples[0].video.uri
+            const veoResponse = result.generateVideoResponse;
+            const samples = veoResponse?.generatedSamples;
+            const videoData = samples?.[0]?.video;
+            const videoUri = videoData?.uri;
+
+            if (videoUri) {
+              console.log("[v0] Found video URI:", videoUri);
+              // Fetch the actual video bytes
+              const downloadResp = await fetch(`${videoUri}&key=${apiKey}`);
+              if (!downloadResp.ok) {
+                throw new Error(
+                  `Video indirme başarısız: ${downloadResp.statusText}`,
+                );
+              }
+              const arrayBuffer = await downloadResp.arrayBuffer();
+              const videoBytes = Buffer.from(arrayBuffer).toString("base64");
+
+              return Response.json({
+                video: `data:video/mp4;base64,${videoBytes}`,
+                videoName: `stylescape-video-${Date.now()}.mp4`,
+              });
+            }
+
+            // Fallback for other potential structures
+            const legacyVideoData = result.generatedVideos?.[0];
             const videoBytes =
-              videoData.videoBytes ||
-              videoData.data ||
-              videoData.video?.videoBytes; // Check multiple paths
+              legacyVideoData?.videoBytes ||
+              legacyVideoData?.data ||
+              legacyVideoData?.video?.videoBytes;
 
             if (!videoBytes) {
-              throw new Error("Video bytes missing in response");
+              console.error(
+                "[v0] Result structure unknown:",
+                JSON.stringify(result, null, 2),
+              );
+              throw new Error("Video verisi bulunamadı");
             }
 
             return Response.json({
@@ -256,7 +322,7 @@ export async function POST(req: Request) {
           error:
             "Video oluşturma zaman aşımına uğradı (90s+). İşlem arka planda devam ediyor olabilir.",
         },
-        { status: 504 }
+        { status: 504 },
       );
     } catch (veoError: any) {
       console.error("[v0] Google Veo error:", veoError);
@@ -288,7 +354,7 @@ export async function POST(req: Request) {
           error: errorMessage,
           stack: veoError instanceof Error ? veoError.stack : undefined,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {
@@ -301,7 +367,7 @@ export async function POST(req: Request) {
             : "Bir hata oluştu. Lütfen tekrar deneyin.",
         stack: error instanceof Error ? error.stack : undefined,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

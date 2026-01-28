@@ -48,7 +48,7 @@ async function analyzeImages(
   ai: GoogleGenAI,
   modelImage: string,
   clothingImage: string,
-  settings: any
+  settings: any,
 ) {
   const modelPart = partFromBase64(modelImage);
   const clothPart = partFromBase64(clothingImage);
@@ -77,9 +77,9 @@ async function analyzeImages(
     Output ONLY the prompt text, no explanations.
   `;
 
-  // Use Gemini 2.0 Flash Exp (verified working)
+  // Use Gemini 2.0 Flash (stable and free)
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.0-flash",
     contents: [
       {
         role: "user",
@@ -95,7 +95,7 @@ async function analyzeImages(
 async function analyzeForRevision(
   ai: GoogleGenAI,
   currentImage: string,
-  instructions: string
+  instructions: string,
 ) {
   const imagePart = partFromBase64(currentImage);
   const prompt = `
@@ -107,9 +107,9 @@ async function analyzeForRevision(
       Output ONLY the new prompt.
     `;
 
-  // Use Gemini 2.0 Flash Exp (verified working)
+  // Use Gemini 2.0 Flash (stable and free)
   const response = await ai.models.generateContent({
-    model: "gemini-2.0-flash-exp",
+    model: "gemini-2.0-flash",
     contents: [
       {
         role: "user",
@@ -123,9 +123,9 @@ async function analyzeForRevision(
 }
 
 async function generateImage(ai: GoogleGenAI, prompt: string): Promise<string> {
-  // UPDATED: Use fast model which was verified to work
+  // Use Imagen 4 (stable and free)
   const response = await ai.models.generateImages({
-    model: "imagen-4.0-fast-generate-001",
+    model: "imagen-4.0-generate-001",
     prompt: prompt,
     config: {
       numberOfImages: 1,
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
           error:
             "GOOGLE_API_KEY eksik. Lütfen ortam değişkenlerini kontrol edin.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
     const ai = new GoogleGenAI({ apiKey });
@@ -178,7 +178,7 @@ export async function POST(req: Request) {
         const description = await analyzeForRevision(
           ai,
           previousResult,
-          revisionInstructions
+          revisionInstructions,
         );
         console.log("[v0] Revised Prompt:", description);
 
@@ -188,7 +188,7 @@ export async function POST(req: Request) {
         } catch (genError: any) {
           console.error(
             "[v0] Revision Image Generation failed:",
-            genError.message
+            genError.message,
           );
           return NextResponse.json({
             image: null,
@@ -201,7 +201,7 @@ export async function POST(req: Request) {
         console.error("[v0] Revision error:", error);
         return NextResponse.json(
           { error: `Revizyon hatası: ${error.message}` },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
@@ -210,7 +210,7 @@ export async function POST(req: Request) {
     if (!modelImage || !clothingImage) {
       return NextResponse.json(
         { error: "Hem manken hem de kıyafet resmi gereklidir" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -221,7 +221,7 @@ export async function POST(req: Request) {
       ai,
       modelImage,
       clothingImage,
-      studioSettings
+      studioSettings,
     );
     console.log("[v0] Analysis complete. Prompt:", analysis);
 
@@ -244,7 +244,7 @@ export async function POST(req: Request) {
     console.error("[v0] General Try-on error:", error);
     return NextResponse.json(
       { error: error.message || "Bilinmeyen bir hata oluştu." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

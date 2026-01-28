@@ -150,7 +150,7 @@ export default function CreateModelPage() {
       alert(
         error instanceof Error
           ? error.message
-          : "Görsel oluşturulurken bir hata oluştu"
+          : "Görsel oluşturulurken bir hata oluştu",
       );
     } finally {
       setIsGenerating(false);
@@ -163,6 +163,9 @@ export default function CreateModelPage() {
       return;
     }
 
+    console.log("[v0] Saving mannequin...");
+    console.log("[v0] Image Data URI length:", generatedImage.length);
+
     setIsSaving(true);
 
     try {
@@ -170,38 +173,57 @@ export default function CreateModelPage() {
 
       const contextPrompt = `Gender: ${gender}, Height: ${height}, Body: ${bodyType}, Size: ${clothingSize}, Skin: ${skinTone}, Hair: ${hairColor} ${hairStyle}, Age: ${ageRange}, Pose: ${pose}, Environment: ${environment}`;
 
-      const { error } = await supabase.from("models").insert({
-        name: name.trim(),
-        description,
-        gender,
-        style,
-        height,
-        body_type: bodyType,
-        clothing_size: clothingSize,
-        skin_tone: skinTone,
-        hair_color: hairColor,
-        hair_style: hairStyle,
-        age_range: ageRange,
-        pose,
-        environment,
-        context_prompt: contextPrompt,
-        image_url: generatedImage,
-      });
+      const { error, data } = await supabase
+        .from("models")
+        .insert({
+          name: name.trim(),
+          description,
+          gender,
+          style,
+          height,
+          body_type: bodyType,
+          clothing_size: clothingSize,
+          skin_tone: skinTone,
+          hair_color: hairColor,
+          hair_style: hairStyle,
+          age_range: ageRange,
+          pose,
+          environment,
+          context_prompt: contextPrompt,
+          image_url: generatedImage,
+        })
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("[v0] Supabase insert error:", error);
+        throw error;
+      }
 
+      console.log("[v0] Saved successfully:", data);
       alert("Manken başarıyla kaydedildi!");
       setName("");
       setDescription("");
       setGeneratedImage(null);
       setReferenceImage(null);
-    } catch (error) {
-      console.error("[v0] Save error:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Manken kaydedilirken bir hata oluştu"
-      );
+    } catch (error: any) {
+      console.error("[v0] Save error object:", error);
+      
+      // Extract a readable error message
+      let errorMessage = "Manken kaydedilirken bir hata oluştu";
+      
+      if (error.message) {
+        errorMessage += `: ${error.message}`;
+      } else if (typeof error === 'object') {
+        errorMessage += `: ${JSON.stringify(error)}`;
+      } else {
+        errorMessage += `: ${String(error)}`;
+      }
+
+      alert(errorMessage);
+      
+      if (generatedImage.length > 2 * 1024 * 1024) {
+        console.warn("[v0] Warning: Image size is large (" + Math.round(generatedImage.length/1024) + " KB). This might exceed database limits.");
+      }
     } finally {
       setIsSaving(false);
     }

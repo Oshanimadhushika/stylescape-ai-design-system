@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
       console.error("[v0] Validation failed: Missing required data");
       return NextResponse.json(
         { error: "Model image and at least one clothing layer required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
           error:
             "GOOGLE_API_KEY eksik. Lütfen ortam değişkenlerini kontrol edin.",
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
 Be extremely detailed and specific so this exact model can be recreated in a new photograph.`;
 
       const modelVisionResult = await ai.models.generateContent({
-        model: "gemini-2.0-flash-exp",
+        model: "gemini-2.0-flash",
         contents: [
           {
             role: "user",
@@ -86,7 +86,7 @@ Be extremely detailed and specific so this exact model can be recreated in a new
         modelVisionResult.text || modelContext || "Professional fashion model";
       console.log(
         "[v0] Model analyzed:",
-        modelDescription.substring(0, 150) + "..."
+        modelDescription.substring(0, 150) + "...",
       );
     } catch (modelAnalysisError) {
       console.error("[v0] Model analysis failed:", modelAnalysisError);
@@ -131,7 +131,7 @@ Be extremely detailed and specific so this exact model can be recreated in a new
 Be extremely detailed and specific so this exact item can be recreated in a fashion photograph.`;
 
         const visionResult = await ai.models.generateContent({
-          model: "gemini-2.0-flash-exp",
+          model: "gemini-2.0-flash",
           contents: [
             {
               role: "user",
@@ -152,16 +152,16 @@ Be extremely detailed and specific so this exact item can be recreated in a fash
         clothingDescriptions.push(`${typeLabels[layer.type]}: ${description}`);
         console.log(
           `[v0] ${layer.type} analyzed:`,
-          description.substring(0, 100) + "..."
+          description.substring(0, 100) + "...",
         );
       } catch (visionError) {
         console.error(
           `[v0] Vision analysis failed for ${layer.type}:`,
-          visionError
+          visionError,
         );
         // Fallback to basic description
         clothingDescriptions.push(
-          `${typeLabels[layer.type]}: ${layer.label || "clothing item"}`
+          `${typeLabels[layer.type]}: ${layer.label || "clothing item"}`,
         );
       }
     }
@@ -293,7 +293,7 @@ OUTPUT: A single professional fashion photograph showing the model wearing EXACT
         {
           error: `Kombin oluşturulamadı: ${errorMessage}`,
         },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error: any) {
@@ -308,7 +308,7 @@ OUTPUT: A single professional fashion photograph showing the model wearing EXACT
       {
         error: error?.message || "Mix & Match generation failed",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
