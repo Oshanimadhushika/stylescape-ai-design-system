@@ -73,7 +73,7 @@ export default function ModelCustomization({
                 />
               </div>
 
-              <div className="flex-1 space-y-6 py-2">
+              <div className="flex-1 space-y-6 py-2 h-[400px] overflow-y-auto pr-2 custom-scrollbar">
                 <div>
                   <h3 className="font-semibold text-gray-900">{model.name}</h3>
                   <p className="text-xs text-gray-500 capitalize">

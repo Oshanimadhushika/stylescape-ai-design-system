@@ -96,22 +96,27 @@ export default function PoseSelection({
                   : "border-transparent hover:border-gray-200",
               )}
             >
-              <div className="absolute inset-0 bg-gray-100 flex items-center justify-center text-gray-300">
-                {/* Placeholder visual */}
-                <div className="w-1/2 h-2/3 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
-                  <span className="text-xs">Pose</span>
-                </div>
+              <div className="absolute inset-0 bg-gray-100">
+                <Image
+                  src={pose.image}
+                  alt={pose.name}
+                  fill
+                  className="object-cover transition-transform duration-500 group-hover:scale-105"
+                />
               </div>
 
               {/* Overlay */}
               {isSelected && (
-                <div className="absolute top-2 right-2 w-6 h-6 bg-black rounded-full flex items-center justify-center z-10">
-                  <Check className="w-3.5 h-3.5 text-white" />
+                <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10 p-2">
+                  <div className="absolute top-2 right-2 w-6 h-6 bg-black rounded-full flex items-center justify-center shadow-lg animate-in zoom-in-50">
+                    <Check className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <div className="w-full h-full border-2 border-black rounded-lg" />
                 </div>
               )}
 
-              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-white text-xs font-medium">
+              <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/80 to-transparent">
+                <span className="text-white text-xs font-bold truncate block shadow-sm">
                   {pose.name}
                 </span>
               </div>

@@ -9,19 +9,19 @@ import ProductSelection from "@/components/on-model/product-selection";
 import ModelCustomization from "../../../components/on-model/model-customization";
 import PoseSelection from "@/components/on-model/pose-selection";
 import BackgroundSelection from "@/components/on-model/background-selection";
+import SummaryView from "@/components/on-model/summary-view";
 import { cn } from "@/lib/utils";
 
 const steps = [
   { id: "products", label: "Select Products" },
   { id: "models", label: "Select Models" },
-  { id: "customization", label: "Customization" },
-  { id: "poses", label: "Select Poses" },
   { id: "background", label: "Select Background" },
   { id: "summary", label: "Summary" },
 ];
 
 export default function OnModelPage() {
-  const [currentStep, setCurrentStep] = useState(0); // Start at Select Products
+  const [currentStep, setCurrentStep] = useState(0); // 4 Top-level Tabs
+  const [subStep, setSubStep] = useState(0); // gallery (0), customization (1), poses (2)
   const [uploadedProducts, setUploadedProducts] = useState<string[]>([]);
   const [selectedModelIds, setSelectedModelIds] = useState<string[]>([]);
   const [modelCustoms, setModelCustoms] = useState<
@@ -31,10 +31,20 @@ export default function OnModelPage() {
   const [selectedBackground, setSelectedBackground] = useState<string | null>(
     null,
   );
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const handleNext = () => {
+    // Logic to move between internal sub-steps of Tab 1 (Select Models)
+    if (currentStep === 1) {
+      if (subStep < 2) {
+        setSubStep(subStep + 1);
+        return;
+      }
+    }
+
     if (currentStep < steps.length - 1) {
       setCurrentStep(currentStep + 1);
+      setSubStep(0); // Reset sub-step when moving between top-level tabs
     }
   };
 
@@ -42,31 +52,43 @@ export default function OnModelPage() {
     // Basic guards
     if (index > currentStep) {
       if (currentStep === 0 && uploadedProducts.length === 0) return;
-      if (currentStep === 1 && selectedModelIds.length === 0) return;
-      if (
-        currentStep === 2 &&
-        selectedModelIds.some(
-          (id) => !modelCustoms[id]?.bodySize || !modelCustoms[id]?.expression,
+      if (currentStep === 1) {
+        if (subStep === 0 && selectedModelIds.length === 0) return;
+        if (
+          subStep === 1 &&
+          selectedModelIds.some(
+            (id) =>
+              !modelCustoms[id]?.bodySize || !modelCustoms[id]?.expression,
+          )
         )
-      )
-        return;
-      if (currentStep === 3 && selectedPoses.length === 0) return;
-      if (currentStep === 4 && !selectedBackground) return;
+          return;
+        if (subStep === 2 && selectedPoses.length === 0) return;
+      }
     }
     setCurrentStep(index);
+    setSubStep(0);
   };
 
   const isNextDisabled = () => {
     if (currentStep === 0) return uploadedProducts.length === 0;
-    if (currentStep === 1) return selectedModelIds.length === 0;
-    if (currentStep === 2) {
-      return selectedModelIds.some(
-        (id) => !modelCustoms[id]?.bodySize || !modelCustoms[id]?.expression,
-      );
+    if (currentStep === 1) {
+      if (subStep === 0) return selectedModelIds.length === 0;
+      if (subStep === 1)
+        return selectedModelIds.some(
+          (id) => !modelCustoms[id]?.bodySize || !modelCustoms[id]?.expression,
+        );
+      if (subStep === 2) return selectedPoses.length === 0;
     }
-    if (currentStep === 3) return selectedPoses.length === 0;
-    if (currentStep === 4) return !selectedBackground;
+    if (currentStep === 2) return !selectedBackground;
     return false;
+  };
+
+  const handleGenerate = async () => {
+    setIsGenerating(true);
+    // Simulation
+    setTimeout(() => {
+      setIsGenerating(false);
+    }, 2000);
   };
 
   return (
@@ -108,15 +130,28 @@ export default function OnModelPage() {
               ))}
             </div>
 
-            <Button
-              size="sm"
-              className="bg-[#1a1b1e] hover:bg-[#2c2d31] text-white rounded-lg h-10 px-6 gap-2 hidden md:flex"
-              onClick={handleNext}
-              disabled={isNextDisabled()}
-            >
-              Next Step
-              <ChevronRight className="w-4 h-4" />
-            </Button>
+            {/* Hide Standard Next Button on Summary Step, as it has its own Generate button */}
+            {currentStep !== 3 && (
+              <Button
+                size="sm"
+                className="bg-[#1a1b1e] hover:bg-[#2c2d31] text-white rounded-lg h-10 px-6 gap-2 hidden md:flex"
+                onClick={handleNext}
+                disabled={isNextDisabled()}
+              >
+                Next Step
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            )}
+            {currentStep === 3 && (
+              <Button
+                size="sm"
+                className="bg-[#1a1b1e] hover:bg-[#2c2d31] text-white rounded-lg h-10 px-6 gap-2 hidden md:flex"
+                onClick={handleGenerate}
+                disabled={isGenerating}
+              >
+                Generate
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -130,41 +165,44 @@ export default function OnModelPage() {
         )}
 
         {currentStep === 1 && (
-          <ModelGallery
-            selectedModels={selectedModelIds}
-            setSelectedModels={setSelectedModelIds}
-          />
+          <>
+            {subStep === 0 && (
+              <ModelGallery
+                selectedModels={selectedModelIds}
+                setSelectedModels={setSelectedModelIds}
+              />
+            )}
+            {subStep === 1 && (
+              <ModelCustomization
+                selectedModelIds={selectedModelIds}
+                modelCustoms={modelCustoms}
+                setModelCustoms={setModelCustoms}
+              />
+            )}
+            {subStep === 2 && (
+              <PoseSelection
+                selectedPoses={selectedPoses}
+                setSelectedPoses={setSelectedPoses}
+              />
+            )}
+          </>
         )}
 
         {currentStep === 2 && (
-          <ModelCustomization
-            selectedModelIds={selectedModelIds}
-            modelCustoms={modelCustoms}
-            setModelCustoms={setModelCustoms}
-          />
-        )}
-
-        {currentStep === 3 && (
-          <PoseSelection
-            selectedPoses={selectedPoses}
-            setSelectedPoses={setSelectedPoses}
-          />
-        )}
-
-        {currentStep === 4 && (
           <BackgroundSelection
             selectedBackground={selectedBackground}
             setSelectedBackground={setSelectedBackground}
           />
         )}
 
-        {currentStep === 5 && (
-          <div className="text-center py-20">
-            <h2 className="text-2xl font-bold">Summary Step</h2>
-            <p className="text-gray-500 mt-2">
-              Final generation summary will go here.
-            </p>
-          </div>
+        {currentStep === 3 && (
+          <SummaryView
+            uploadedProducts={uploadedProducts}
+            selectedModelIds={selectedModelIds}
+            selectedBackgroundId={selectedBackground}
+            onGenerate={handleGenerate}
+            isGenerating={isGenerating}
+          />
         )}
       </main>
 
@@ -172,10 +210,10 @@ export default function OnModelPage() {
       <div className="md:hidden fixed bottom-16 left-0 right-0 p-4 border-t border-gray-100 bg-white/80 backdrop-blur-md z-40">
         <Button
           className="w-full bg-[#1a1b1e] hover:bg-[#2c2d31] text-white rounded-xl h-12 text-lg font-medium"
-          onClick={handleNext}
-          disabled={isNextDisabled()}
+          onClick={currentStep === 3 ? handleGenerate : handleNext}
+          disabled={currentStep === 3 ? isGenerating : isNextDisabled()}
         >
-          Next Step
+          {currentStep === 3 ? "Generate" : "Next Step"}
         </Button>
       </div>
     </div>

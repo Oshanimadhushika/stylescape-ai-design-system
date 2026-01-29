@@ -55,33 +55,35 @@ export default function BackgroundSelection({
         {filteredBackgrounds.map((bg) => {
           const isSelected = selectedBackground === bg.id;
           return (
-            <div
-              key={bg.id}
-              onClick={() => setSelectedBackground(bg.id)}
-              className={cn(
-                "group relative aspect-square rounded-xl overflow-hidden cursor-pointer transition-all border-2",
-                isSelected
-                  ? "border-black"
-                  : "border-transparent hover:border-gray-200",
-              )}
-            >
-              <div className="absolute inset-0 bg-gray-100 flex items-center justify-center text-gray-300">
-                {/* Placeholder visual */}
-                <span className="text-xs">{bg.category}</span>
-              </div>
+            <div key={bg.id} className="group flex flex-col gap-2">
+              <div
+                onClick={() => setSelectedBackground(bg.id)}
+                className={cn(
+                  "relative aspect-square rounded-lg overflow-hidden cursor-pointer transition-all",
+                  isSelected
+                    ? "ring-2 ring-black ring-offset-2"
+                    : "hover:ring-2 hover:ring-gray-200 hover:ring-offset-1",
+                )}
+              >
+                {/* Image */}
+                <div
+                  className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-110"
+                  style={{ backgroundImage: `url(${bg.image})` }}
+                />
 
-              {/* Overlay */}
-              {isSelected && (
-                <div className="absolute inset-0 bg-black/10 flex items-center justify-center z-10">
-                  <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center animate-in zoom-in-50">
-                    <Check className="w-4 h-4 text-white" />
+                {/* Overlay Checkmark */}
+                {isSelected && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center z-10">
+                    <div className="w-8 h-8 bg-black rounded-full flex items-center justify-center animate-in zoom-in-50 shadow-lg">
+                      <Check className="w-4 h-4 text-white" />
+                    </div>
                   </div>
-                </div>
-              )}
-
-              <div className="absolute botton-2 left-2 right-2 text-center pointer-events-none">
-                {/* Optional Label */}
+                )}
               </div>
+
+              <h3 className="text-sm font-semibold text-gray-900 group-hover:text-black transition-colors">
+                {bg.name}
+              </h3>
             </div>
           );
         })}
