@@ -86,11 +86,32 @@ export default function CreateVideoPage() {
         }),
       });
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error("[v0] JSON parsing error:", jsonError);
+        if (response.status === 504) {
+          throw new Error(
+            "Timeout Error: Video generation is taking longer than expected. Please wait a moment and try again.",
+          );
+        }
+        throw new Error(
+          "Error: Received invalid response from server. Please try again later.",
+        );
+      }
 
       if (!response.ok) {
         console.error("[v0] Video generation failed:", data);
-        throw new Error(data.error || "Bir hata oluştu");
+        if (response.status === 504 || data.isTimeout) {
+          throw new Error(
+            data.error ||
+              "Timeout Error: Video generation is taking longer than expected. The video is being processed in the background. Please refresh in 1-2 minutes.",
+          );
+        }
+        throw new Error(
+          data.error || "An error occurred during video generation.",
+        );
       }
 
       console.log("[v0] Video generated successfully:", data);
@@ -100,7 +121,7 @@ export default function CreateVideoPage() {
       alert(
         error instanceof Error
           ? error.message
-          : "Video oluşturulurken bir hata oluştu"
+          : "Video oluşturulurken bir hata oluştu",
       );
     } finally {
       setIsGenerating(false);

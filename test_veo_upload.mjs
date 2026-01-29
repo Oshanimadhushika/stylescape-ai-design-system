@@ -24,17 +24,21 @@ const base64Image = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP
 async function run() {
     console.log("1. Saving temp image...");
     const tempFile = "temp_test_image.png";
-    fs.writeFileSync(tempFile, Buffer.from(base64Image, 'base64'));
+    const absolutePath = path.resolve(tempFile);
+    console.log("Saving to:", absolutePath);
+    fs.writeFileSync(absolutePath, Buffer.from(base64Image, 'base64'));
 
     try {
         console.log("2. Uploading to Gemini Files...");
+        console.log("Starting upload call at:", new Date().toISOString());
         const uploadResult = await ai.files.upload({
-            file: tempFile,
+            file: absolutePath,
             config: {
                 mimeType: "image/png",
                 displayName: "Test Image"
             }
         });
+        console.log("Ending upload call at:", new Date().toISOString());
 
         console.log("Upload Result:", JSON.stringify(uploadResult, null, 2));
 
@@ -45,13 +49,9 @@ async function run() {
         }
 
         console.log("Upload Success! URI:", fileUri);
-        console.log("State:", uploadResult.state); // Fixed access
+        console.log("State:", uploadResult.state);
 
         console.log("3. Calling generateVideos with URI...");
-
-        // Wait for file specifically if needed? Usually for image it's fast.
-        // For video inputs, ACTIVE state is needed. For image, maybe okay?
-        // But SDK usually handles wait? Or we check it.
 
         const response = await ai.models.generateVideos({
             model: "veo-3.1-generate-preview",
@@ -65,8 +65,12 @@ async function run() {
         console.log("SUCCESS! Operation:", response.name);
 
     } catch (e) {
-        console.log("Error:", e.message);
+        console.log("Error caught at:", new Date().toISOString());
+        console.log("Error Name:", e.constructor.name);
+        console.log("Error Message:", e.message);
+        if (e.cause) console.log("Error Cause:", e.cause);
         if (e.status) console.log("Status:", e.status);
+        console.log("Error Stack:", e.stack);
     }
 }
 

@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 
-export const maxDuration = 60; // Max execution time for Vercel
+export const maxDuration = 300; // Max execution time for Vercel (Pro plan, but safeguard added for Hobby)
 
 // Move initialization inside handler to ensure env vars are ready
 // const ai = new GoogleGenAI({ ... });
@@ -100,7 +100,7 @@ ${style ? `Style: ${style}.` : ""} ${
       // 1. Upload Input Image to Gemini Files API
       console.log("[v0] Uploading image to Gemini Files...");
 
-      const tempFilePath = path.join(
+      const tempFilePath = path.resolve(
         os.tmpdir(),
         `veo_input_${Date.now()}.png`,
       );
@@ -123,12 +123,20 @@ ${style ? `Style: ${style}.` : ""} ${
         fileUri = (uploadResult as any).file?.uri || (uploadResult as any).uri;
         console.log("[v0] Image uploaded successfully:", fileUri);
       } catch (uploadError: any) {
-        console.error("[v0] Upload failed:", uploadError);
-        throw new Error(`Image upload failed: ${uploadError.message}`);
+        console.error("[v0] Upload to Gemini Files failed:", uploadError);
+        // On local, if this fails with 'fetch failed', it's often an IPv6 issue.
+        const detail = uploadError.message?.includes("fetch failed")
+          ? "Network error (fetch failed). This may be a local connection issue."
+          : uploadError.message;
+        throw new Error(`Image upload failed: ${detail}`);
       } finally {
-        fs.unlink(tempFilePath, (err) => {
-          if (err) console.error("Temp cleanup warning:", err.message);
-        });
+        try {
+          if (fs.existsSync(tempFilePath)) {
+            await fs.promises.unlink(tempFilePath);
+          }
+        } catch (cleanupError) {
+          console.error("Temp cleanup warning:", cleanupError);
+        }
       }
 
       if (!fileUri) throw new Error("Dosya yükleme başarısız oldu (URI eksik)");
@@ -221,10 +229,28 @@ ${style ? `Style: ${style}.` : ""} ${
 
       // 2. Poll for Completion with Backoff and Error Handling
       const startTime = Date.now();
-      const MAX_POLL_TIME = 90000; // 90 seconds (extended)
-      const POLLING_INTERVAL = 20000; // 20 seconds (Veo is slow, save quota)
+      const MAX_POLL_TIME = 250000; // 250 seconds total (Safeguard will catch it earlier)
+      const VERCEL_SAFEGUARD_TIMEOUT = 55000; // 55 seconds (Return JSON before Vercel 60s kill)
+      const POLLING_INTERVAL = 15000; // 15 seconds (Veo is slow, save quota)
 
       while (Date.now() - startTime < MAX_POLL_TIME) {
+        // Vercel Safeguard: If we are close to the 60s limit (typical for Hobby plans), return a JSON error
+        // instead of letting Vercel timeout with a 504 HTML page.
+        if (Date.now() - startTime > VERCEL_SAFEGUARD_TIMEOUT) {
+          console.warn(
+            "[v0] Vercel safeguard timeout reached. Returning JSON error.",
+          );
+          return Response.json(
+            {
+              error:
+                "Video generation is taking longer than expected. Please try again in 1-2 minutes.",
+              isTimeout: true,
+              operationName: operationName,
+            },
+            { status: 504 },
+          );
+        }
+
         await new Promise((r) => setTimeout(r, POLLING_INTERVAL));
 
         try {
