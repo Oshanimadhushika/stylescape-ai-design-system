@@ -29,6 +29,11 @@ const navItems = [
     icon: Layers,
   },
   {
+    title: "On-Model Flow",
+    href: "/create/on-model",
+    icon: ImageIcon,
+  },
+  {
     title: "Video Oluştur",
     href: "/create-video",
     icon: Video,
@@ -60,7 +65,7 @@ export function Navigation() {
                   buttonVariants({
                     variant: pathname === item.href ? "secondary" : "ghost",
                   }),
-                  "gap-2"
+                  "gap-2",
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -90,7 +95,7 @@ export function Navigation() {
                       buttonVariants({
                         variant: pathname === item.href ? "secondary" : "ghost",
                       }),
-                      "w-full justify-start gap-2"
+                      "w-full justify-start gap-2",
                     )}
                   >
                     <Icon className="h-4 w-4" />
